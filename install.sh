@@ -1,25 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN_DIR="$HOME/.local/bin"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="${HOME}/.local/bin"
 
-mkdir -p "$BIN_DIR"
-cp "$REPO_DIR/bin/claude-profile" "$BIN_DIR/claude-profile"
-cp "$REPO_DIR/bin/agy-profile" "$BIN_DIR/agy-profile"
-chmod +x "$BIN_DIR/claude-profile" "$BIN_DIR/agy-profile"
+mkdir -p "${BIN_DIR}"
+cp "${REPO_DIR}/bin/ai-profile" "${BIN_DIR}/ai-profile"
+cp "${REPO_DIR}/bin/claude-profile" "${BIN_DIR}/claude-profile"
+cp "${REPO_DIR}/bin/agy-profile" "${BIN_DIR}/agy-profile"
+cp "${REPO_DIR}/bin/codex-profile" "${BIN_DIR}/codex-profile"
+cp "${REPO_DIR}/bin/grok-profile" "${BIN_DIR}/grok-profile"
+chmod +x "${BIN_DIR}/ai-profile" "${BIN_DIR}/claude-profile" "${BIN_DIR}/agy-profile" "${BIN_DIR}/codex-profile" "${BIN_DIR}/grok-profile"
 
-# Install agent skill for Claude Code & Antigravity if directories exist
-if [ -d "$HOME/.claude" ]; then
-  mkdir -p "$HOME/.claude/skills/claude-multiprofile"
-  cp "$REPO_DIR/skills/claude-multiprofile/SKILL.md" "$HOME/.claude/skills/claude-multiprofile/SKILL.md"
-fi
+# Install Agent Skill for Claude Code & Google Antigravity
+for skill_name in multi-ai-profile claude-multiprofile; do
+  for skill_root in "${HOME}/.claude/skills/${skill_name}" "${HOME}/.gemini/config/skills/${skill_name}"; do
+    mkdir -p "${skill_root}"
+    cp "${REPO_DIR}/skills/multi-ai-profile/SKILL.md" "${skill_root}/SKILL.md"
+  done
+done
 
-if [ -d "$HOME/.gemini/config" ]; then
-  mkdir -p "$HOME/.gemini/config/skills/claude-multiprofile"
-  cp "$REPO_DIR/skills/claude-multiprofile/SKILL.md" "$HOME/.gemini/config/skills/claude-multiprofile/SKILL.md"
-fi
-
-echo "[✓] Installed claude-profile and agy-profile to $BIN_DIR"
-echo "    Try: claude-profile create Work --color blue"
-echo "    Try: agy-profile create Work --color blue"
+echo "✅ Installed universal CLI & shortcuts to ${BIN_DIR}:"
+echo "   • ai-profile      (Universal: claude, antigravity, codex, chatgpt, grok, cursor, windsurf, cline, --app)"
+echo "   • claude-profile  (Claude Desktop shortcut)"
+echo "   • agy-profile     (Google Antigravity shortcut)"
+echo "   • codex-profile   (OpenAI Codex / ChatGPT Desktop shortcut)"
+echo "   • grok-profile    (xAI Grok Desktop shortcut)"
+echo "✅ Installed multi-ai-profile Agent Skill for Claude Code & Antigravity"
+echo ""
+echo "Try creating your first isolated profiles:"
+echo "  ai-profile create claude Work --color blue"
+echo "  ai-profile create antigravity Work --color blue"
+echo "  ai-profile create codex Work --color blue"
+echo "  ai-profile create grok Work --color blue"

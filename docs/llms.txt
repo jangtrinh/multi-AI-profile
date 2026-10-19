@@ -1,33 +1,12 @@
-# Claude & Antigravity Multi-Profile (`claude-antigravity-multiprofile`)
+# multi-AI-profile
 
-> Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.
+> Universal macOS APFS copy-on-write bundle cloner and native Mach-O launcher that isolates accounts, background daemons, CLI homes, MCP configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex/ChatGPT, xAI Grok, Cursor, Windsurf, Cline, and any Electron AI app.
 
-Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.
+- Repository: https://github.com/jangtrinh/multi-AI-profile
+- Documentation: https://jangtrinh.github.io/multi-AI-profile/
+- License: MIT
 
-## Key Capabilities
-
-- **True macOS Window & Bundle Identity**: Replaces `osacompile` / `open -n -a` wrapper scripts with APFS copy-on-write (`cp -cR`, 0 MB disk overhead) standalone `.app` bundles, renamed Framework Helpers, distinct `CFBundleDisplayName` / `CFBundleIdentifier`, and compiled Mach-O `execv()` launchers.
-- **Auto-Badged Native `.icns` Icons**: Composites high-contrast color pill badges (`WORK`, `EXTRA`, `DEV`) onto the 1024x1024 app icon and compiles native `.icns` via `iconutil`.
-- **Single-Layer (Claude) & Dual-Layer (Antigravity) Isolation**:
-  - `claude-profile`: Wraps `Contents/MacOS/Claude` with `--user-data-dir="$HOME/Library/Application Support/Claude-<Name>"`, isolating both account login and `claude_desktop_config.json`.
-  - `agy-profile`: Wraps both `Contents/MacOS/Antigravity` (`--user-data-dir`) and `Contents/Resources/bin/language_server` (`--gemini_dir="$HOME/.gemini-profiles/<Name>"`), isolating Google OAuth tokens (`jetski-standalone-oauth-token`) and `mcp_config.json` while symlinking global `GEMINI.md`, `skills`, `agents`, and `plugins`.
-
-## Quickstart
-
-```bash
-git clone https://github.com/jangtrinh/claude-antigravity-multiprofile.git
-cd claude-antigravity-multiprofile
-./install.sh
-
-claude-profile create Work --color blue
-claude-profile create Extra --color purple
-
-agy-profile create Work --color blue
-agy-profile create Extra --color purple --share-auth
-```
-
-## Links
-
-- [Live Site](https://jangtrinh.github.io/claude-antigravity-multiprofile/)
-- [GitHub Repository](https://github.com/jangtrinh/claude-antigravity-multiprofile)
-- [Agent Skill Specification](https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/skills/claude-multiprofile/SKILL.md)
+## Core CLI Commands
+- `ai-profile create <claude|antigravity|codex|chatgpt|grok|cursor|windsurf|cline|custom> "<Name>" [--color <preset|#HEX>] [--badge "<TEXT>"] [--app "/Applications/App.app"]`
+- `ai-profile list [target]`
+- `ai-profile remove <target> "<Name>" [--purge-data]`

@@ -1,0 +1,620 @@
+#!/usr/bin/env python3
+"""
+ai-profile — Universal macOS Multi-Profile App Cloner & Isolator for AI Desktop Apps
+Supports:
+  - claude       (Anthropic Claude Desktop)
+  - antigravity  (Google Antigravity IDE)
+  - codex        (OpenAI Codex Desktop / ChatGPT.app in Codex mode)
+  - chatgpt      (OpenAI ChatGPT Desktop)
+  - grok         (xAI Grok Bot / Grok Desktop)
+  - cursor       (Cursor AI IDE)
+  - windsurf     (Windsurf AI IDE)
+  - cline        (Cline Desktop)
+  - custom       (Any Electron / Chromium macOS .app via --app)
+
+Zero disk overhead via APFS copy-on-write (cp -cR), native Mach-O execv() wrapper,
+dual-layer daemon & CLI state isolation, custom WindowServer/AltTab titles, and badged .icns icons.
+"""
+
+import argparse
+import os
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+COLOR_PRESETS = {
+    "blue":       ("#1D4ED8", "#0F172A"),
+    "purple":     ("#6D28D9", "#1E1B4B"),
+    "emerald":    ("#047857", "#022C22"),
+    "amber":      ("#B45309", "#451A03"),
+    "rose":       ("#BE123C", "#4C0519"),
+    "cyan":       ("#0E7490", "#083344"),
+    "slate":      ("#334155", "#0F172A"),
+    "terracotta": ("#C2410C", "#431407"),
+}
+
+PRESET_ORDER = ["blue", "purple", "emerald", "amber", "rose", "cyan", "slate", "terracotta"]
+
+TARGETS = {
+    "claude": {
+        "label": "Claude",
+        "candidates": ["/Applications/Claude.app"],
+        "data_prefix": "Claude",
+        "config_dir_prefix": ".claude-profiles",
+        "mcp_relpath": ("app_support", "claude_desktop_config.json"),
+    },
+    "antigravity": {
+        "label": "Antigravity",
+        "candidates": ["/Applications/Antigravity.app", "/Applications/Antigravity IDE.app"],
+        "data_prefix": "Antigravity",
+        "config_dir_prefix": ".gemini-profiles",
+        "mcp_relpath": ("config_dir", "antigravity/mcp_config.json"),
+    },
+    "codex": {
+        "label": "Codex",
+        "candidates": ["/Applications/Codex.app", "/Applications/ChatGPT.app", "/Applications/Codex Web GPT.app"],
+        "data_prefix": "Codex",
+        "config_dir_prefix": ".codex-profiles",
+        "mcp_relpath": ("config_dir", "config.toml"),
+        "prefer_png_icon": "icon-codex-dark-color.png",
+    },
+    "chatgpt": {
+        "label": "ChatGPT",
+        "candidates": ["/Applications/ChatGPT.app"],
+        "data_prefix": "ChatGPT",
+        "config_dir_prefix": ".codex-profiles",
+        "mcp_relpath": ("config_dir", "config.toml"),
+    },
+    "grok": {
+        "label": "Grok",
+        "candidates": ["/Applications/Grok Bot.app", "/Applications/Grok.app"],
+        "data_prefix": "Grok",
+        "config_dir_prefix": ".grok-profiles",
+        "mcp_relpath": ("config_dir", "config.toml"),
+    },
+    "cursor": {
+        "label": "Cursor",
+        "candidates": ["/Applications/Cursor.app"],
+        "data_prefix": "Cursor",
+        "config_dir_prefix": ".cursor-profiles",
+        "mcp_relpath": ("config_dir", "mcp.json"),
+    },
+    "windsurf": {
+        "label": "Windsurf",
+        "candidates": ["/Applications/Windsurf.app"],
+        "data_prefix": "Windsurf",
+        "config_dir_prefix": ".windsurf-profiles",
+        "mcp_relpath": ("config_dir", "mcp_config.json"),
+    },
+    "cline": {
+        "label": "Cline",
+        "candidates": ["/Applications/Cline.app"],
+        "data_prefix": "Cline",
+        "config_dir_prefix": ".cline-profiles",
+        "mcp_relpath": ("app_support", "mcp_settings.json"),
+    },
+}
+
+TARGET_ALIASES = {
+    "agy": "antigravity",
+    "claude-desktop": "claude",
+    "grok-bot": "grok",
+    "openai": "codex",
+}
+
+
+def resolve_target(target_raw: str, custom_app: str | None = None) -> tuple[str, dict, Path]:
+    key = TARGET_ALIASES.get(target_raw.lower(), target_raw.lower())
+    if custom_app:
+        app_path = Path(custom_app).expanduser().resolve()
+        if not app_path.exists():
+            sys.exit(f"Error: Custom app not found at {app_path}")
+        stem = app_path.stem
+        spec = {
+            "label": stem,
+            "candidates": [str(app_path)],
+            "data_prefix": stem.replace(" ", ""),
+            "config_dir_prefix": f".{stem.lower().replace(' ', '-')}-profiles",
+            "mcp_relpath": ("app_support", "config.json"),
+        }
+        return key, spec, app_path
+
+    if key in TARGETS:
+        spec = TARGETS[key]
+        for cand in spec["candidates"]:
+            p = Path(cand)
+            if p.exists():
+                return key, spec, p
+        sys.exit(f"Error: None of {spec['candidates']} found for target '{key}'. Use --app /path/to/App.app")
+
+    # Fallback: check /Applications/<Target>.app
+    fallback = Path(f"/Applications/{target_raw}.app")
+    if fallback.exists():
+        stem = fallback.stem
+        spec = {
+            "label": stem,
+            "candidates": [str(fallback)],
+            "data_prefix": stem.replace(" ", ""),
+            "config_dir_prefix": f".{stem.lower().replace(' ', '-')}-profiles",
+            "mcp_relpath": ("app_support", "config.json"),
+        }
+        return key, spec, fallback
+
+    sys.exit(f"Error: Unknown target '{target_raw}' and /Applications/{target_raw}.app not found.")
+
+
+def slugify(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]+", "-", name.strip()).strip("-").lower()
+
+
+def parse_color(color_arg: str | None, profile_name: str) -> tuple[str, str]:
+    if not color_arg:
+        idx = sum(ord(c) for c in profile_name) % len(PRESET_ORDER)
+        return COLOR_PRESETS[PRESET_ORDER[idx]]
+    key = color_arg.lower().strip()
+    if key in COLOR_PRESETS:
+        return COLOR_PRESETS[key]
+    if re.match(r"^#?[0-9a-fA-F]{6}$", key):
+        hex_val = key if key.startswith("#") else f"#{key}"
+        return (hex_val, "#0F172A")
+    sys.exit(f"Error: Unknown color '{color_arg}'. Choose from: {', '.join(COLOR_PRESETS.keys())} or a 6-digit hex code.")
+
+
+def hex_to_rgba(h: str, a: int = 255) -> tuple[int, int, int, int]:
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (a,)
+
+
+def build_badged_icns(base_icon_source: Path, dest_icns: Path, badge_text: str, fill_hex: str, border_hex: str, preview_png: Path | None = None):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        shutil.copy2(base_icon_source, dest_icns)
+        return
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        orig_png = tmp / "orig.png"
+        if base_icon_source.suffix.lower() == ".png":
+            shutil.copy2(base_icon_source, orig_png)
+        else:
+            subprocess.run(["sips", "-s", "format", "png", str(base_icon_source), "--out", str(orig_png)],
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        base_img = Image.open(orig_png).convert("RGBA")
+        if base_img.size != (1024, 1024):
+            base_img = base_img.resize((1024, 1024), Image.Resampling.LANCZOS)
+        w, h = base_img.size
+
+        overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        font_paths = [
+            "/System/Library/Fonts/SFNSRounded.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Rounded Bold.ttf",
+            "/System/Library/Fonts/HelveticaNeue.ttc",
+        ]
+        font_size = 152 if len(badge_text) <= 5 else (128 if len(badge_text) <= 7 else 104)
+        font = None
+        for fp in font_paths:
+            if os.path.exists(fp):
+                try:
+                    font = ImageFont.truetype(fp, font_size)
+                    break
+                except Exception:
+                    pass
+        if font is None:
+            font = ImageFont.load_default()
+
+        bbox = draw.textbbox((0, 0), badge_text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+        pad_x, pad_y = 72, 34
+        pill_w = max(tw + pad_x * 2, 440)
+        pill_h = th + pad_y * 2
+        pill_x1 = (w - pill_w) // 2
+        pill_y1 = h - pill_h - 68
+        pill_x2 = pill_x1 + pill_w
+        pill_y2 = pill_y1 + pill_h
+        radius = pill_h // 2
+
+        draw.rounded_rectangle([pill_x1 - 6, pill_y1 + 10, pill_x2 + 6, pill_y2 + 16], radius=radius + 6, fill=(0, 0, 0, 140))
+        draw.rounded_rectangle([pill_x1 - 10, pill_y1 - 10, pill_x2 + 10, pill_y2 + 10], radius=radius + 10, fill=(255, 255, 255, 245))
+        draw.rounded_rectangle([pill_x1 - 3, pill_y1 - 3, pill_x2 + 3, pill_y2 + 3], radius=radius + 3, fill=hex_to_rgba(border_hex, 255))
+        draw.rounded_rectangle([pill_x1, pill_y1, pill_x2, pill_y2], radius=radius, fill=hex_to_rgba(fill_hex, 255))
+
+        tx = pill_x1 + (pill_w - tw) // 2 - bbox[0]
+        ty = pill_y1 + (pill_h - th) // 2 - bbox[1]
+        draw.text((tx, ty + 4), badge_text, font=font, fill=(0, 0, 0, 115))
+        draw.text((tx, ty), badge_text, font=font, fill=(255, 255, 255, 255))
+
+        out = Image.alpha_composite(base_img, overlay)
+        master_png = tmp / "master.png"
+        out.save(master_png)
+        if preview_png:
+            shutil.copy2(master_png, preview_png)
+
+        iconset = tmp / "electron.iconset"
+        iconset.mkdir()
+        sizes = [
+            (16, "icon_16x16.png"),
+            (32, "icon_16x16@2x.png"),
+            (32, "icon_32x32.png"),
+            (64, "icon_32x32@2x.png"),
+            (128, "icon_128x128.png"),
+            (256, "icon_128x128@2x.png"),
+            (256, "icon_256x256.png"),
+            (512, "icon_256x256@2x.png"),
+            (512, "icon_512x512.png"),
+            (1024, "icon_512x512@2x.png"),
+        ]
+        for sz, fname in sizes:
+            resized = out.resize((sz, sz), Image.Resampling.LANCZOS)
+            resized.save(iconset / fname)
+
+        subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(dest_icns)], check=True)
+
+
+def compile_mach_o_wrapper(target_exec: Path, real_exec_name: str, extra_args: list[str], env_vars: dict[str, str]):
+    env_c_lines = []
+    for k, v in env_vars.items():
+        env_c_lines.append(f'    setenv("{k}", "{v}", 1);')
+    env_block = "\n".join(env_c_lines)
+
+    args_c_lines = []
+    for idx, arg in enumerate(extra_args, start=1):
+        args_c_lines.append(f'    new_argv[{idx}] = "{arg}";')
+    args_block = "\n".join(args_c_lines)
+    n_extra = len(extra_args)
+
+    c_code = f"""#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <mach-o/dyld.h>
+#include <libgen.h>
+
+int main(int argc, char *argv[]) {{
+    char exe_path[4096];
+    uint32_t size = sizeof(exe_path);
+    if (_NSGetExecutablePath(exe_path, &size) != 0) return 1;
+    char *dir = dirname(exe_path);
+
+    char real_bin[4096];
+    snprintf(real_bin, sizeof(real_bin), "%s/{real_exec_name}", dir);
+
+{env_block}
+
+    char **new_argv = malloc(sizeof(char *) * (argc + {n_extra + 2}));
+    new_argv[0] = argv[0];
+{args_block}
+    for (int i = 1; i < argc; i++) {{
+        new_argv[i + {n_extra}] = argv[i];
+    }}
+    new_argv[argc + {n_extra}] = NULL;
+
+    execv(real_bin, new_argv);
+    perror("execv failed");
+    return 1;
+}}
+"""
+    with tempfile.NamedTemporaryFile(suffix=".c", mode="w", delete=False) as f:
+        f.write(c_code)
+        c_file = f.name
+    try:
+        subprocess.run(["clang", "-O2", "-arch", "arm64", "-arch", "x86_64", c_file, "-o", str(target_exec)], check=True)
+        os.chmod(target_exec, 0o755)
+    finally:
+        os.unlink(c_file)
+
+
+def patch_helper_apps(frameworks_dir: Path, orig_prefix: str, app_display_name: str, slug: str):
+    if not frameworks_dir.exists():
+        return
+    # Match both top-level Frameworks/*Helper*.app and nested Frameworks/*.framework/Versions/*/Helpers/*.app
+    helper_candidates = list(frameworks_dir.glob("*.app")) + list(frameworks_dir.glob("*.framework/Versions/*/Helpers/*.app"))
+    for helper_app in helper_candidates:
+        h_plist = helper_app / "Contents/Info.plist"
+        if not h_plist.exists():
+            continue
+        try:
+            with open(h_plist, "rb") as f:
+                hpl = plistlib.load(f)
+            old_name = hpl.get("CFBundleName", helper_app.stem)
+            if old_name.startswith(orig_prefix):
+                suffix = old_name[len(orig_prefix):]
+                new_h_name = f"{app_display_name}{suffix}"
+            else:
+                new_h_name = f"{app_display_name} ({old_name})"
+            hpl["CFBundleName"] = new_h_name
+            hpl["CFBundleDisplayName"] = new_h_name
+            h_id = hpl.get("CFBundleIdentifier", "com.ai.helper")
+            hpl["CFBundleIdentifier"] = f"{h_id}.{slug}"
+            with open(h_plist, "wb") as f:
+                plistlib.dump(hpl, f)
+        except Exception:
+            pass
+
+
+def cmd_create(args):
+    target_key, spec, source_app = resolve_target(args.target, getattr(args, "app", None))
+    raw_name = args.name.strip()
+    label = spec["label"]
+    prefix_re = re.compile(rf"^{re.escape(label)}\s+", re.IGNORECASE)
+    short_name = prefix_re.sub("", raw_name).strip()
+    if not short_name:
+        sys.exit("Error: Profile name cannot be empty.")
+
+    app_display_name = f"{label} {short_name}"
+    slug = slugify(short_name)
+    badge_text = (args.badge or short_name).upper()[:10]
+    fill_hex, border_hex = parse_color(args.color, short_name)
+
+    dest_dir = Path.home() / "Applications"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_app = dest_dir / f"{app_display_name}.app"
+
+    data_dir = Path.home() / "Library/Application Support" / f"{spec['data_prefix']}-{short_name.replace(' ', '-')}"
+    config_root = Path.home() / spec["config_dir_prefix"] / slug
+    data_dir.mkdir(parents=True, exist_ok=True)
+    config_root.mkdir(parents=True, exist_ok=True)
+
+    # Read source Info.plist
+    src_plist_path = source_app / "Contents/Info.plist"
+    with open(src_plist_path, "rb") as f:
+        src_pl = plistlib.load(f)
+    exec_name = src_pl.get("CFBundleExecutable", label)
+    icon_file = src_pl.get("CFBundleIconFile", "icon.icns")
+    if not icon_file.endswith(".icns"):
+        icon_file = f"{icon_file}.icns"
+
+    # Target-specific isolation & seeding
+    env_vars = {}
+    extra_args = [f"--user-data-dir={data_dir}"]
+
+    if target_key == "claude":
+        env_vars["CLAUDE_CONFIG_DIR"] = str(config_root)
+        mcp_file = data_dir / "claude_desktop_config.json"
+        if not mcp_file.exists():
+            mcp_file.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
+
+    elif target_key == "antigravity":
+        agy_app_data = config_root / "antigravity"
+        agy_app_data.mkdir(parents=True, exist_ok=True)
+        mcp_file = agy_app_data / "mcp_config.json"
+        if not mcp_file.exists():
+            mcp_file.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
+        orig_agy_data = Path.home() / "Library/Application Support/Antigravity"
+        orig_storage = orig_agy_data / "User/globalStorage/storage.json"
+        dest_user_dir = data_dir / "User/globalStorage"
+        dest_user_dir.mkdir(parents=True, exist_ok=True)
+        if orig_storage.exists() and not (dest_user_dir / "storage.json").exists():
+            shutil.copy2(orig_storage, dest_user_dir / "storage.json")
+        if (orig_agy_data / "User/settings.json").exists() and not (data_dir / "User/settings.json").exists():
+            shutil.copy2(orig_agy_data / "User/settings.json", data_dir / "User/settings.json")
+
+    elif target_key in ("codex", "chatgpt"):
+        env_vars["CODEX_HOME"] = str(config_root)
+        env_vars["CODEX_ELECTRON_USER_DATA_PATH"] = str(data_dir)
+        mcp_file = config_root / "config.toml"
+        if not mcp_file.exists():
+            mcp_file.write_text("# Isolated Codex / ChatGPT profile config\n", encoding="utf-8")
+
+    elif target_key == "grok":
+        grokbot_root = Path.home() / ".grokbot-profiles" / slug
+        grokbot_root.mkdir(parents=True, exist_ok=True)
+        env_vars["GROK_HOME"] = str(config_root)
+        env_vars["SAND_DATA_ROOT"] = str(grokbot_root)
+        env_vars["SAND_USER_DATA_DIR"] = str(data_dir)
+        mcp_file = config_root / "config.toml"
+        if not mcp_file.exists():
+            mcp_file.write_text("# Isolated Grok profile config\n", encoding="utf-8")
+
+    else:
+        mcp_file = data_dir / "config.json"
+
+    if dest_app.exists():
+        shutil.rmtree(dest_app)
+
+    print(f"[1/5] Cloning {source_app.name} -> {dest_app} (APFS Copy-on-Write)...")
+    res = subprocess.run(["cp", "-cR", str(source_app), str(dest_app)], stderr=subprocess.PIPE)
+    if res.returncode != 0:
+        shutil.copytree(source_app, dest_app, symlinks=True)
+
+    print(f"[2/5] Patching Info.plist & Framework Helpers for '{app_display_name}'...")
+    plist_path = dest_app / "Contents/Info.plist"
+    with open(plist_path, "rb") as f:
+        pl = plistlib.load(f)
+
+    orig_bundle_name = pl.get("CFBundleName", label)
+    pl["CFBundleName"] = app_display_name
+    pl["CFBundleDisplayName"] = app_display_name
+    orig_id = pl.get("CFBundleIdentifier", f"com.ai.{target_key}")
+    pl["CFBundleIdentifier"] = f"{orig_id}.{slug}"
+    # Remove Assets.car icon override & localized display name override so our custom name & .icns always win
+    pl.pop("CFBundleIconName", None)
+    pl.pop("LSHasLocalizedDisplayName", None)
+
+    with open(plist_path, "wb") as f:
+        plistlib.dump(pl, f)
+
+    patch_helper_apps(dest_app / "Contents/Frameworks", orig_bundle_name, app_display_name, slug)
+
+    print(f"[3/5] Generating badged icon '{badge_text}' ({fill_hex})...")
+    res_dir = dest_app / "Contents/Resources"
+    dest_icns = res_dir / icon_file
+    base_icon_source = source_app / "Contents/Resources" / icon_file
+    prefer_png = spec.get("prefer_png_icon")
+    if prefer_png and (source_app / "Contents/Resources" / prefer_png).exists():
+        base_icon_source = source_app / "Contents/Resources" / prefer_png
+
+    preview_png = Path(args.save_icon_png).expanduser() if getattr(args, "save_icon_png", None) else None
+    build_badged_icns(base_icon_source, dest_icns, badge_text, fill_hex, border_hex, preview_png=preview_png)
+    # Also replace Assets.car if present so macOS Sequoia never falls back to unbadged asset catalog icon
+    assets_car = res_dir / "Assets.car"
+    if assets_car.exists():
+        assets_car.unlink()
+
+    print(f"[4/5] Compiling native Mach-O launcher(s) for '{app_display_name}'...")
+    macos_dir = dest_app / "Contents/MacOS"
+    main_exec = macos_dir / exec_name
+    real_exec_name = f"{exec_name}Real"
+    real_exec = macos_dir / real_exec_name
+    if not real_exec.exists():
+        main_exec.rename(real_exec)
+    compile_mach_o_wrapper(main_exec, real_exec_name, extra_args, env_vars)
+
+    # Antigravity second layer: Go language_server binary
+    if target_key == "antigravity":
+        agy_app_data = config_root / "antigravity"
+        bin_dir = dest_app / "Contents/Resources/bin"
+        for ls_bin in bin_dir.glob("language_server*"):
+            if ls_bin.name.endswith("Real"):
+                continue
+            ls_real_name = f"{ls_bin.name}Real"
+            ls_real = bin_dir / ls_real_name
+            if not ls_real.exists():
+                ls_bin.rename(ls_real)
+            compile_mach_o_wrapper(
+                ls_bin,
+                ls_real_name,
+                [f"--gemini_dir={config_root}", f"--app_data_dir={agy_app_data}"],
+                {},
+            )
+
+    print(f"[5/5] Signing '{dest_app.name}' & registering with LaunchServices...")
+    subprocess.run(["chmod", "-R", "u+w", str(dest_app)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["xattr", "-cr", str(dest_app)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(dest_app)],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    if os.path.exists(lsregister):
+        subprocess.run([lsregister, "-f", str(dest_app)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    print("\n✅ Profile created successfully!")
+    print(f"   • Target     : {target_key} ({source_app.name})")
+    print(f"   • App Bundle : {dest_app}")
+    print(f"   • Window Name: {app_display_name}")
+    print(f"   • Badge      : {badge_text} ({fill_hex})")
+    print(f"   • Data Dir   : {data_dir}")
+    print(f"   • Config Dir : {config_root}")
+    print(f"   • Config File: {mcp_file}")
+
+
+def cmd_list(args):
+    apps_dir = Path.home() / "Applications"
+    target_filter = TARGET_ALIASES.get(args.target.lower(), args.target.lower()) if getattr(args, "target", None) else None
+
+    apps = sorted(apps_dir.glob("*.app")) if apps_dir.exists() else []
+    matched = []
+    for app in apps:
+        plist_path = app / "Contents/Info.plist"
+        if not plist_path.exists():
+            continue
+        try:
+            with open(plist_path, "rb") as f:
+                pl = plistlib.load(f)
+            bid = pl.get("CFBundleIdentifier", "")
+            bname = pl.get("CFBundleDisplayName", app.stem)
+        except Exception:
+            continue
+
+        # Identify if it's one of our cloned profiles (has *Real or *-bin executable in Contents/MacOS)
+        macos_dir = app / "Contents/MacOS"
+        real_bins = (list(macos_dir.glob("*Real")) + list(macos_dir.glob("*-bin"))) if macos_dir.exists() else []
+        if not real_bins:
+            continue
+
+        detected_target = "custom"
+        for tkey, tspec in TARGETS.items():
+            if bname.lower().startswith(tspec["label"].lower() + " "):
+                detected_target = tkey
+                break
+        if target_filter and detected_target != target_filter:
+            continue
+        matched.append((detected_target, app, bname, bid))
+
+    if not matched:
+        print("No isolated AI profiles found in ~/Applications.")
+        return
+
+    print(f"Found {len(matched)} isolated AI profile(s) in ~/Applications:\n")
+    for tkey, app, bname, bid in matched:
+        spec = TARGETS.get(tkey, {"label": tkey.title(), "data_prefix": tkey.title(), "config_dir_prefix": f".{tkey}-profiles"})
+        short = bname[len(spec["label"]):].strip()
+        slug = slugify(short)
+        data_dir = Path.home() / "Library/Application Support" / f"{spec['data_prefix']}-{short.replace(' ', '-')}"
+        cfg_dir = Path.home() / spec["config_dir_prefix"] / slug
+        print(f"  • [{tkey.upper()}] {bname}")
+        print(f"    Bundle : {app}")
+        print(f"    ID     : {bid}")
+        print(f"    Data   : {data_dir} ({'exists' if data_dir.exists() else 'not initialized'})")
+        print(f"    Config : {cfg_dir} ({'exists' if cfg_dir.exists() else 'not initialized'})")
+
+
+def cmd_remove(args):
+    target_key, spec, _ = resolve_target(args.target, getattr(args, "app", None))
+    label = spec["label"]
+    raw_name = args.name.strip()
+    prefix_re = re.compile(rf"^{re.escape(label)}\s+", re.IGNORECASE)
+    short_name = prefix_re.sub("", raw_name).strip()
+    app_display_name = f"{label} {short_name}"
+    slug = slugify(short_name)
+
+    dest_app = Path.home() / "Applications" / f"{app_display_name}.app"
+    data_dir = Path.home() / "Library/Application Support" / f"{spec['data_prefix']}-{short_name.replace(' ', '-')}"
+    config_root = Path.home() / spec["config_dir_prefix"] / slug
+
+    subprocess.run(["pkill", "-f", str(dest_app)], check=False)
+    if dest_app.exists():
+        shutil.rmtree(dest_app)
+        print(f"Removed app bundle: {dest_app}")
+    else:
+        print(f"App bundle not found: {dest_app}")
+
+    if args.purge_data:
+        for d in [data_dir, config_root, Path.home() / ".grokbot-profiles" / slug]:
+            if d.exists():
+                shutil.rmtree(d)
+                print(f"Purged data directory: {d}")
+    else:
+        print(f"Preserved data directories: {data_dir}, {config_root} (pass --purge-data to delete)")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="ai-profile",
+        description="Universal macOS Multi-Profile Cloner & Isolator for Claude, Antigravity, Codex, ChatGPT, Grok, Cursor, Windsurf, and any Electron AI App."
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_create = sub.add_parser("create", help="Create or update an isolated AI Desktop profile")
+    p_create.add_argument("target", help="Target AI app: claude, antigravity (agy), codex, chatgpt, grok, cursor, windsurf, cline, or custom")
+    p_create.add_argument("name", help="Profile name (e.g. 'Work', 'Extra', 'Personal')")
+    p_create.add_argument("--badge", help="Custom short text on icon pill badge (default: uppercase profile name)")
+    p_create.add_argument("--color", help=f"Badge color preset ({', '.join(COLOR_PRESETS.keys())}) or hex (#RRGGBB)")
+    p_create.add_argument("--app", help="Custom source .app path (e.g. '/Applications/Cursor.app')")
+    p_create.add_argument("--save-icon-png", help="Save a 1024x1024 PNG preview of the generated icon to this path")
+    p_create.set_defaults(func=cmd_create)
+
+    p_list = sub.add_parser("list", help="List all installed AI profiles")
+    p_list.add_argument("target", nargs="?", help="Optional target filter (claude, antigravity, codex, grok, etc.)")
+    p_list.set_defaults(func=cmd_list)
+
+    p_rm = sub.add_parser("remove", help="Remove an isolated AI profile")
+    p_rm.add_argument("target", help="Target AI app (claude, antigravity, codex, grok, etc.)")
+    p_rm.add_argument("name", help="Profile name (e.g. 'Work', 'Extra')")
+    p_rm.add_argument("--app", help="Custom source .app path if removing a custom app profile")
+    p_rm.add_argument("--purge-data", action="store_true", help="Also delete isolated Application Support & config directories")
+    p_rm.set_defaults(func=cmd_remove)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

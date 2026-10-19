@@ -1,33 +1,4 @@
-# GitHub Pages site for claude-antigravity-multiprofile, built from this docs/ folder.
-# _layouts/default.html wraps every Markdown page in the landing's design language;
-# index.html is a hand-built page (layout: null) sharing assets/site.css.
-# jekyll-seo-tag emits <title>, <meta name="description">, Open Graph and JSON-LD;
-# jekyll-sitemap emits sitemap.xml for Google Search Console.
-title: claude-antigravity-multiprofile
-description: Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.
-url: https://jangtrinh.github.io
-baseurl: /claude-antigravity-multiprofile
-lang: en
-repository: jangtrinh/claude-antigravity-multiprofile
-repository_url: https://github.com/jangtrinh/claude-antigravity-multiprofile
-wordmark: DESIGN:OS
-wordmark_url: https://github.com/jangtrinh
-eyebrow: MACOS AI WORKFLOW · MULTI-PROFILE          # short product family label, e.g. design:os
-logo: /images/cover.png          # a real capture under docs/images/
-nav:                        # one entry per Markdown page under docs/, in reading order
-  - { title: Deep dive, url: /deep-dive.html }
-footer:
-  - { title: GitHub, url: https://github.com/jangtrinh/claude-antigravity-multiprofile }
-  - { title: MIT, url: https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/LICENSE }
-plugins:
-  - jekyll-seo-tag
-  - jekyll-sitemap
-  - jekyll-relative-links
-relative_links:
-  enabled: true
-  collections: false
-defaults:
-  - scope: { path: "" }
-    values: { layout: default }
-  - scope: { path: "google*.html" }
-    values: { sitemap: false }
+title: multi-AI-profile
+description: Isolated Claude, Antigravity, Codex & Grok profiles on macOS with zero disk overhead.
+url: "https://jangtrinh.github.io"
+baseurl: "/multi-AI-profile"

@@ -1,91 +1,56 @@
 ---
-name: claude-multiprofile
-description: Create and manage isolated multi-profile Claude Desktop instances on macOS with distinct names, badged icons, dedicated data directories, and separate MCP server configurations.
+name: multi-ai-profile
+description: Create and manage isolated multi-profile macOS desktop app instances for Claude Desktop, Google Antigravity, OpenAI Codex / ChatGPT, xAI Grok, Cursor, Windsurf, Cline, and any Electron/Chromium AI app with distinct window names, badged Dock icons, zero APFS disk overhead, and separate MCP / CLI configurations.
 ---
 
-# Claude Multi-Profile Workflow & CLI
+# Universal macOS Multi-AI-Profile (`ai-profile`)
 
-Use this skill whenever you need to create, manage, or debug separate Claude Desktop profiles on macOS.
+Use this skill whenever the user wants to:
+- Create a second/third isolated **Claude Desktop**, **Google Antigravity**, **OpenAI Codex / ChatGPT**, **xAI Grok**, **Cursor**, **Windsurf**, or **Cline** app on macOS (`Work`, `Extra`, `Personal`, `Client`, etc.)
+- Customize the app name in AltTab / Mission Control / Dock and add a high-contrast pill badge (`WORK`, `EXTRA`, etc.) to the app icon
+- Isolate accounts, cookies, CLI homes (`CLAUDE_CONFIG_DIR`, `--gemini_dir`, `CODEX_HOME`, `GROK_HOME`), and MCP server configurations per profile
 
-Each created profile has:
-1. **Dedicated macOS Standalone Bundle:** Cloned via instant APFS copy-on-write to `~/Applications/Claude <Name>.app`.
-2. **Distinct App & Window Identity:** Own `CFBundleDisplayName` and `CFBundleIdentifier` so AltTab, Mission Control, Cmd+Tab, and Menubar show the exact profile name (e.g. `Claude Work`, `Claude Extra`) instead of generic `Claude`.
-3. **Badged Custom Icon:** Built-in Pillow + `iconutil` pipeline badges the official Claude icon with a high-contrast pill tag (`WORK`, `EXTRA`, etc.) and custom color.
-4. **Isolated Storage & Credentials:** Data stored at `~/Library/Application Support/Claude-<Name>`.
-5. **Separate MCP Servers:** Independent `claude_desktop_config.json` per profile.
+## Why Not `osacompile` / `open -n -a`?
 
----
+AppleScript wrappers (`osacompile`) that call `open -n -a "Claude" --args --user-data-dir=...` fail in macOS WindowServer:
+1. **Duplicate Window Names:** AltTab, Mission Control, and `Cmd+Tab` read `CFBundleName` from the running process's `Info.plist` and `Contents/Frameworks/*Helper*.app`, so every window still displays as `Claude`, `Antigravity`, `ChatGPT`, or `Grok Bot`.
+2. **Duplicate Icons & `Assets.car` Override:** macOS Sequoia prioritizes `Assets.car` (`CFBundleIconName`) over `.icns` unless `CFBundleIconName` and `Assets.car` are stripped on the clone.
+3. **Shared Background Daemons & CLI Homes:**
+   - **Antigravity:** `Contents/Resources/bin/language_server_macos_arm` defaults to `~/.gemini` unless wrapped with `--gemini_dir` and `--app_data_dir`.
+   - **OpenAI Codex / ChatGPT:** Reads `~/.codex` (`auth.json`, `config.toml`) unless `CODEX_HOME` and `CODEX_ELECTRON_USER_DATA_PATH` are injected into the native Mach-O launcher.
+   - **xAI Grok Desktop:** Reads `~/.grok` and `~/.grokbot` unless `GROK_HOME`, `SAND_DATA_ROOT`, and `SAND_USER_DATA_DIR` are injected.
 
-## 1. Quick CLI Usage
+## Commands
 
-A CLI tool is installed at `~/.local/bin/claude-profile`.
+### 1. Universal CLI (`ai-profile`)
 
-### Create a Profile
 ```bash
-claude-profile create <Name> [--color <color>]
-```
-- Available colors: `blue`, `purple`, `green`, `emerald`, `orange`, `amber`, `red`, `pink`, `cyan`, `teal`, `gray`, `dark`.
-- Examples:
-  ```bash
-  claude-profile create Work --color blue
-  claude-profile create Extra --color purple
-  claude-profile create Personal --color emerald
-  claude-profile create Dev --color orange
-  ```
+# Create isolated profiles for any supported target
+ai-profile create claude "Work" --color blue
+ai-profile create antigravity "Work" --color blue
+ai-profile create codex "Work" --color blue
+ai-profile create grok "Work" --color blue
+ai-profile create chatgpt "Extra" --color purple
+ai-profile create cursor "Work" --color emerald
 
-### List Profiles
-```bash
-claude-profile list
-```
+# Or clone any custom Electron/Chromium .app on macOS
+ai-profile create custom "Work" --app "/Applications/Perplexity.app" --color cyan
 
-### Delete Profile App
-```bash
-claude-profile delete <Name>
-```
-*(Preserves user data directory so no chats/credentials are lost unintentionally).*
+# List all isolated AI profiles across all targets
+ai-profile list
 
----
-
-## 2. Profile Paths Reference
-
-- **Profile 1 (Default):**
-  - App: `/Applications/Claude.app`
-  - Data: `~/Library/Application Support/Claude`
-  - MCP: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Profile N (`Claude <Name>`):**
-  - App: `~/Applications/Claude <Name>.app`
-  - Data: `~/Library/Application Support/Claude-<Name>`
-  - MCP: `~/Library/Application Support/Claude-<Name>/claude_desktop_config.json`
-
----
-
-## 3. Architecture Details
-
-When building manually without the CLI:
-1. **APFS Clone:** `cp -cR /Applications/Claude.app ~/Applications/"Claude <Name>.app"`
-2. **Rename Framework Helpers:** In `Contents/Frameworks/`, rename `Claude Helper*.app` to `Claude <Name> Helper*.app` and update inner `Info.plist` (both CFBundleDisplayName, CFBundleName, and CFBundleExecutable).
-3. **Info.plist:** Set `CFBundleDisplayName`, `CFBundleName`, `CFBundleIdentifier`, remove `CFBundleIconName` and `Assets.car`.
-4. **Launcher:** Replace `Contents/MacOS/Claude` with a native Mach-O C binary that invokes `Claude.real --user-data-dir="$HOME/Library/Application Support/Claude-<Name>"` with `execv()`.
-5. **Icon:** Place badged `.icns` at `Contents/Resources/electron.icns`.
-6. **Codesign & Register:** `codesign --force --deep --sign - ...` and `lsregister -f -r ...`.
-
----
-
-## 4. Antigravity Multi-Profile CLI (`agy-profile`)
-
-An equivalent CLI tool is installed at `~/.local/bin/agy-profile` for creating isolated **Antigravity.app** instances:
-
-### Create an Antigravity Profile
-```bash
-# Mode 1: Isolated Google Account + isolated conversations + symlinked global skills/agents/rules
-agy-profile create Work --color blue
-agy-profile create Extra --color purple
-
-# Mode 2: Share the default Google Account login while isolating windows & conversation state
-agy-profile create Second --color emerald --share-auth
+# Remove a profile (preserves data by default; add --purge-data to wipe)
+ai-profile remove codex "Work"
 ```
 
-### How Antigravity Multi-Profile Works Under the Hood
-Unlike Claude Desktop (which only needs `--user-data-dir` on the Electron binary), Antigravity has two layers:
-1. **Electron Frontend (`Contents/MacOS/Antigravity`):** Wrapped with a Mach-O launcher passing `--user-data-dir="$HOME/Library/Application Support/Antigravity-<Name>"` to bypass `requestSingleInstanceLock()` and isolate window/UI state, plus `CFBundleDisplayName` / `CFBundleIdentifier` and badged `icon.icns`.
-2. **Go Backend (`Contents/Resources/bin/language_server`):** Wrapped with a Mach-O launcher passing `--gemini_dir="$HOME/.gemini-profiles/<Name>"` (which isolates `jetski-standalone-oauth-token` and `antigravity/` state while symlinking `GEMINI.md`, `config/skills`, `config/agents`, and `config/plugins` from `~/.gemini`).
+### 2. Shortcut CLIs
+
+```bash
+claude-profile create "Work" --color blue
+agy-profile create "Work" --color blue
+codex-profile create "Work" --color blue
+grok-profile create "Work" --color blue
+```
+
+### Available Badge Colors
+`blue`, `purple`, `emerald`, `amber`, `rose`, `cyan`, `slate`, `terracotta`, or any 6-digit hex code (`#RRGGBB`).

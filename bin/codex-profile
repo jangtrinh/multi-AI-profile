@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+cmd="$1"
+shift || true
+exec "/Users/jang/.local/bin/ai-profile" "$cmd" "codex" "$@"

@@ -1,162 +1,200 @@
-# Claude & Antigravity Multi-Profile (`claude-antigravity-multiprofile`)
+# Multi-AI-Profile (`multi-AI-profile`)
 
-**Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.**
+**Run multiple isolated Claude Desktop, Google Antigravity, OpenAI Codex / ChatGPT, xAI Grok, Cursor, and Windsurf accounts on macOS with custom window names, badged Dock icons, separate MCP/CLI configs, and zero disk overhead.**
 
-Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.
+Instant APFS copy-on-write macOS bundle cloner and native Mach-O `execv()` launcher that isolates Electron UI storage, background Go/Rust daemons, CLI homes (`CLAUDE_CONFIG_DIR`, `--gemini_dir`, `CODEX_HOME`, `GROK_HOME`), MCP configs, and AltTab/Mission Control window names.
 
-<p align="center">
-  <img src="docs/images/cover.png" alt="Claude Desktop and Google Antigravity Multi-Profile Overview" width="880">
+<p align="left">
+  <img src="https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/Platform-macOS%20(APFS)-0f172a?style=flat-square" alt="macOS APFS" />
+  <img src="https://img.shields.io/badge/Targets-Claude%20%C2%B7%20Antigravity%20%C2%B7%20Codex%20%C2%B7%20Grok%20%C2%B7%20Any%20App-2563eb?style=flat-square" alt="Supported Targets" />
+  <img src="https://img.shields.io/badge/Disk%20Overhead-0%20MB%20(CoW)-6d28d9?style=flat-square" alt="Zero Disk Overhead" />
+  <img src="https://img.shields.io/badge/Telemetry-Zero-047857?style=flat-square" alt="Zero Telemetry" />
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/jangtrinh/claude-antigravity-multiprofile?style=for-the-badge" alt="License: MIT" height="28"></a>
-  <img src="https://img.shields.io/badge/platform-macOS_(APFS)-202020?style=for-the-badge" alt="Platform: macOS APFS" height="28">
-  <img src="https://img.shields.io/badge/targets-Claude_Desktop_%C2%B7_Antigravity-2563eb?style=for-the-badge" alt="Targets: Claude Desktop & Antigravity" height="28">
-  <img src="https://img.shields.io/badge/disk_overhead-0_MB_(CoW)-202020?style=for-the-badge" alt="Zero Disk Overhead" height="28">
-  <img src="https://img.shields.io/badge/telemetry-zero-202020?style=for-the-badge" alt="Zero Telemetry" height="28">
-  <a href="https://jangtrinh.github.io/claude-antigravity-multiprofile/"><img src="https://img.shields.io/badge/live_docs-GitHub_Pages-202020?style=for-the-badge" alt="Live GitHub Pages" height="28"></a>
-  <a href="https://buymeacoffee.com/jangtrinh"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" height="28"></a>
-</p>
-
-<p align="center">
-  <a href="#1-nhu-cầu--vấn-đề-the-problem">Nhu cầu & Vấn đề</a> · <a href="#2-giải-pháp-kiến-trúc-the-solution">Giải pháp</a> · <a href="#3-bộ-logo--bằng-chứng-trực-quan-logo--visual-showcase">Logo Showcase</a> · <a href="#4-cài-đặt--sử-dụng-quickstart">Quickstart</a> · <a href="#5-cơ-chế-hoạt-động-under-the-hood">Cơ chế</a>
+  <img src="docs/images/cover.png" alt="Multi-AI-Profile — Claude, Antigravity, Codex, and Grok isolated profiles with custom WORK and EXTRA badges" width="100%" />
 </p>
 
 ---
 
-## 1. Nhu cầu & Vấn đề (The Problem)
+## 1. Nhu cầu thực tế & Vấn đề (The Problem)
 
-Khi sử dụng **Claude Desktop** và **Google Antigravity** hàng ngày, rất nhiều kỹ sư có nhu cầu chạy **nhiều tài khoản song song** trên cùng một máy Mac:
-- **Tài khoản 1 (Personal):** Dùng cho dự án cá nhân, gắn MCP servers cá nhân.
-- **Tài khoản 2 (Work / Enterprise):** Dùng tài khoản công ty, gắn MCP servers nội bộ (Jira, Confluence, Database nội bộ) mà **không được phép lẫn sang profile cá nhân**.
-- **Tài khoản 3 (Extra / Dev):** Dùng để test hoặc dự phòng khi hết quota.
+Khi sử dụng các ứng dụng AI Desktop trên macOS (**Claude Desktop**, **Google Antigravity**, **OpenAI Codex / ChatGPT**, **xAI Grok**, **Cursor**, **Windsurf**...), rất nhiều kỹ sư và người dùng gặp chung 3 nhu cầu thực tế:
 
-### Tại sao cách tạo wrapper bằng `osacompile` / `open -n -a` thông thường bị lỗi nhận diện?
-
-Cách phổ biến thường được chia sẻ là dùng `osacompile` gọi lệnh:
-```bash
-open -n -a "Claude" --args --user-data-dir="$HOME/Library/Application Support/Claude-Work"
-```
-
-Cách này tuy mở được 2 cửa sổ nhưng vì vẫn gọi trực tiếp vào bundle gốc `/Applications/Claude.app`, macOS WindowServer sẽ coi tất cả cửa sổ đều thuộc về cùng một app tên là **`Claude`** với cùng một icon giống hệt nhau. Khi bấm **`Cmd + Tab`**, **AltTab**, hoặc **Mission Control**, bạn không thể phân biệt cửa sổ nào là Personal, cửa sổ nào là Work:
+1. **Chạy song song nhiều tài khoản (Multi-Account):**
+   - **Profile 1 (Bản gốc):** Tài khoản Cá nhân (Personal).
+   - **Profile 2 (`Work`):** Tài khoản Công ty (Team / Enterprise).
+   - **Profile 3 (`Extra`):** Tài khoản phụ cho dự án khách hàng hoặc tránh chạm rate-limit khi đang code dở.
+2. **Tách biệt hoàn toàn cấu hình MCP Server & CLI Home:**
+   - Gắn các MCP Server nội bộ công ty (Jira, Confluence, DB Production, Internal Git) vào bản `Work` mà không sợ lộ hoặc lẫn sang bản `Personal`.
+   - Tách riêng biến môi trường và kho dữ liệu ngầm của từng nền tảng (`CLAUDE_CONFIG_DIR`, `--gemini_dir`, `CODEX_HOME`, `GROK_HOME`, `SAND_DATA_ROOT`).
+3. **Phân biệt tức thì trên AltTab, Mission Control, Spotlight và thanh Dock:**
+   - Cách làm phổ biến trên mạng là dùng `osacompile` tạo AppleScript gọi `open -n -a "Claude" --args --user-data-dir=...`.
+   - **Nhược điểm chí mạng của `osacompile`:** AppleScript chỉ là trình mồi rồi tắt ngay, còn cửa sổ thật vẫn chạy từ tiến trình gốc trong `/Applications/`. Hệ điều hành macOS (`WindowServer`), **AltTab**, **Mission Control** và `Cmd + Tab` đọc tên từ `Info.plist` của tiến trình đang chạy nên **cả 3 cửa sổ đều bị trùng tên và trùng hệt icon**:
 
 <p align="center">
-  <img src="docs/images/window-switcher-problem.png" alt="AltTab showing two identical windows both named Claude" width="760">
+  <img src="docs/images/window-switcher-problem.png" alt="Vấn đề khi dùng osacompile: các cửa sổ bị trùng tên và trùng icon trong AltTab" width="520" />
 </p>
 
 ---
 
 ## 2. Giải pháp kiến trúc (The Solution)
 
-Bộ công cụ **`claude-profile`** và **`agy-profile`** giải quyết triệt để bằng cách tạo **Standalone macOS Application Bundle** thực thụ cho từng profile chỉ với 1 lệnh:
+Bộ công cụ `ai-profile` (cùng các lệnh tắt `claude-profile`, `agy-profile`, `codex-profile`, `grok-profile`) giải quyết triệt để ở cấp độ **Native macOS Application Bundle**:
 
-| Tiêu chí | Cách `osacompile` / `open -n -a` cũ | `claude-profile` & `agy-profile` (Repo này) |
+| Hạng mục | Cách cũ (`osacompile` / `open -n -a`) | Giải pháp `multi-AI-profile` (Repo này) |
 | :--- | :--- | :--- |
-| **Tên hiển thị trên AltTab / Cmd+Tab / Mission Control** | Tất cả cửa sổ đều bị trùng tên là `Claude` | Hiển thị tên riêng biệt: **`Claude`**, **`Claude Work`**, **`Claude Extra`**, **`Antigravity Work`** |
-| **Icon trên Dock / Spotlight / Finder** | Trùng 1 icon duy nhất hoặc dính icon AppleScript | Tự động gắn **Badge màu nổi bật** (`WORK`, `EXTRA`, `DEV`) chuẩn `.icns` đa độ phân giải |
-| **Dung lượng ổ cứng tiêu tốn** | ~0 MB | **0 MB** — Dùng cơ chế APFS Copy-on-Write (`cp -cR`) clone bundle 650MB trong 0.8 giây mà không tốn thêm dung lượng |
-| **Cấu hình MCP Server** | Dễ bị lẫn hoặc phải sửa tay | Mỗi profile có file `claude_desktop_config.json` / `mcp_config.json` độc lập hoàn toàn |
-| **Hỗ trợ Google Antigravity (2 tầng)** | Không tách được tài khoản Google (vì `language_server` đọc chung `~/.gemini`) | Bọc cả 2 tầng (**Electron Frontend** + **Go `language_server`**) để tách riêng token OAuth Google (`jetski-standalone-oauth-token`) nhưng **tự động symlink toàn bộ `GEMINI.md`, `skills`, `agents`, `plugins`** từ `~/.gemini` gốc |
+| **Tên cửa sổ trong AltTab / Mission Control** | ❌ Bị trùng tên gốc (`Claude`, `Antigravity`, `ChatGPT`, `Grok Bot`) | ✅ Tên riêng biệt (`Claude Work`, `Antigravity Work`, `Codex Work`, `Grok Work`) |
+| **Icon trên Dock / Spotlight / Cmd+Tab** | ❌ Trùng icon gốc (hoặc bị `Assets.car` của macOS Sequoia đè lại) | ✅ Tự động gỡ `Assets.car` override & vẽ nhãn màu (`WORK`, `EXTRA`) nét căng lên `.icns` |
+| **Dung lượng ổ cứng tốn thêm** | 0 MB | ✅ **0 MB** nhờ cơ chế **APFS Copy-on-Write (`cp -cR`)** dùng chung data blocks |
+| **Thời gian tạo App mới** | ~2 giây | ✅ **< 1.5 giây** (nhân bản CoW + biên dịch Mach-O wrapper + đóng dấu icon) |
+| **Cách ly tiến trình ngầm & CLI Home** | ❌ Dùng chung `~/.gemini`, `~/.codex`, `~/.grok`, `~/.grokbot` | ✅ Bọc cả UI Electron lẫn Daemon ngầm (`language_server`, `CODEX_HOME`, `GROK_HOME`, `SAND_DATA_ROOT`) |
+
+### 5 bước kỹ thuật tự động bên dưới:
+
+1. **Nhân bản Zero-Copy với APFS (`cp -cR`):** Clone nguyên bản `.app` từ `/Applications/` sang `~/Applications/<App> <Profile>.app` bằng cơ chế Copy-on-Write của APFS — tốn **0 MB** dung lượng thật và hoàn tất trong chưa đầy 1 giây.
+2. **Patch `Info.plist` & toàn bộ Framework Helpers:** Đổi `CFBundleName`, `CFBundleDisplayName`, `CFBundleIdentifier` của cả app chính lẫn toàn bộ các tiến trình con (`*Helper (Renderer).app`, `Codex Framework.framework/Helpers/Codex (*.app)`), đồng thời loại bỏ khóa `CFBundleIconName` / `LSHasLocalizedDisplayName` để macOS WindowServer luôn hiển thị đúng tên và icon mới.
+3. **Biên dịch Native Mach-O Binary (`clang -O2` Universal Binary):** Đổi tên binary gốc thành `*Real` và biên dịch một file thực thi C mỏng nhẹ gọi trực tiếp `execv()` kèm cờ `--user-data-dir` và các biến môi trường cô lập.
+4. **Cách ly đa tầng (Multi-Layer Daemon & CLI Isolation) theo từng hãng AI:**
+   - **Claude Desktop (`claude`):** Cô lập `--user-data-dir` (`~/Library/Application Support/Claude-<Profile>`), `CLAUDE_CONFIG_DIR` (`~/.claude-profiles/<slug>`) và `claude_desktop_config.json`.
+   - **Google Antigravity (`antigravity` / `agy`):** Bọc **2 tầng Mach-O** cho cả `Contents/MacOS/Antigravity` (`--user-data-dir`) lẫn Go daemon `Contents/Resources/bin/language_server_macos_arm` (`--gemini_dir` & `--app_data_dir`), giữ nguyên theme/extension từ bản gốc.
+   - **OpenAI Codex / ChatGPT (`codex` / `chatgpt`):** Cô lập `--user-data-dir`, `CODEX_ELECTRON_USER_DATA_PATH` và `CODEX_HOME` (`~/.codex-profiles/<slug>/config.toml` & `auth.json`). Với target `codex`, tự động kích hoạt bộ icon **Codex Dark (`>_`)** chính chủ ẩn bên trong bundle `ChatGPT.app`.
+   - **xAI Grok Desktop (`grok`):** Cô lập `--user-data-dir`, `SAND_USER_DATA_DIR`, daemon socket `SAND_DATA_ROOT` (`~/.grokbot-profiles/<slug>`) và `GROK_HOME` (`~/.grok-profiles/<slug>/config.toml` & `auth.json`).
+   - **Cursor / Windsurf / Cline / Bất kỳ App nào (`--app`):** Tự động nhận diện `CFBundleExecutable`, `CFBundleIconFile`, bọc Mach-O `--user-data-dir` và đóng dấu icon.
+5. **Tự động vẽ Pill Badge lên `.icns` & Ký số Ad-hoc (`codesign`):** Chuẩn hóa icon gốc về `1024×1024`, vẽ nhãn chữ nổi bật (`WORK`, `EXTRA`...) vào toàn bộ 10 kích thước chuẩn Apple Iconset, xóa `Assets.car` trong bản clone để tránh macOS Sequoia ghi đè icon, ký lại bằng `codesign --force --deep --sign -` và đăng ký ngay với `lsregister`.
 
 ---
 
-## 3. Bộ Logo & Bằng chứng trực quan (Logo & Visual Showcase)
+## 3. Bộ sưu tập Logo & Hình ảnh thực tế (Logo & Visual Showcase)
 
-### 3.1. Bộ Icon Claude Desktop (`claude-profile`)
+### 3.1. Claude Desktop Profiles (`claude`)
 
 <p align="center">
-  <img src="docs/images/claude-profiles-row.png" alt="Claude, Claude Work, and Claude Extra Icons" width="840">
+  <img src="docs/images/claude-profiles-row.png" alt="Claude Desktop Default, Work, Extra Icons" width="100%" />
 </p>
 
-| `Claude (Default)` | `Claude Work` (`--color blue`) | `Claude Extra` (`--color purple`) |
+| Bản gốc (`Claude.app`) | Bản Công ty (`Claude Work.app`) | Bản Phụ (`Claude Extra.app`) |
 | :---: | :---: | :---: |
-| <img src="docs/images/claude-default.png" width="180" alt="Claude Default"> | <img src="docs/images/claude-work.png" width="180" alt="Claude Work"> | <img src="docs/images/claude-extra.png" width="180" alt="Claude Extra"> |
-| `/Applications/Claude.app` | `~/Applications/Claude Work.app` | `~/Applications/Claude Extra.app` |
-| `Application Support/Claude` | `Application Support/Claude-Work` | `Application Support/Claude-Extra` |
+| <img src="docs/images/claude-default.png" width="160" alt="Claude Default" /> | <img src="docs/images/claude-work.png" width="160" alt="Claude Work" /> | <img src="docs/images/claude-extra.png" width="160" alt="Claude Extra" /> |
+| `~/Library/Application Support/Claude` | `~/Library/Application Support/Claude-Work` | `~/Library/Application Support/Claude-Extra` |
 
-### 3.2. Bộ Icon Google Antigravity (`agy-profile`)
+### 3.2. Google Antigravity Profiles (`antigravity` / `agy`)
 
 <p align="center">
-  <img src="docs/images/antigravity-profiles-row.png" alt="Antigravity, Antigravity Work, and Antigravity Extra Icons" width="840">
+  <img src="docs/images/antigravity-profiles-row.png" alt="Google Antigravity Default, Work, Extra Icons" width="100%" />
 </p>
 
-| `Antigravity (Default)` | `Antigravity Work` (`--color blue`) | `Antigravity Extra` (`--color purple`) |
+| Bản gốc (`Antigravity.app`) | Bản Công ty (`Antigravity Work.app`) | Bản Phụ (`Antigravity Extra.app`) |
 | :---: | :---: | :---: |
-| <img src="docs/images/agy-default.png" width="180" alt="Antigravity Default"> | <img src="docs/images/agy-work.png" width="180" alt="Antigravity Work"> | <img src="docs/images/agy-extra.png" width="180" alt="Antigravity Extra"> |
-| `/Applications/Antigravity.app` | `~/Applications/Antigravity Work.app` | `~/Applications/Antigravity Extra.app` |
-| `~/.gemini` | `~/.gemini-profiles/Work` | `~/.gemini-profiles/Extra` |
+| <img src="docs/images/agy-default.png" width="160" alt="Antigravity Default" /> | <img src="docs/images/agy-work.png" width="160" alt="Antigravity Work" /> | <img src="docs/images/agy-extra.png" width="160" alt="Antigravity Extra" /> |
+| `~/.gemini` | `~/.gemini-profiles/work` | `~/.gemini-profiles/extra` |
 
-### 3.3. Hiển thị thực tế trong Finder, Terminal & Cửa sổ đăng nhập độc lập
-
-<p align="center">
-  <img src="docs/images/finder-apps.png" alt="Claude Extra and Claude Work inside macOS Finder ~/Applications" width="840">
-</p>
+### 3.3. OpenAI Codex / ChatGPT Profiles (`codex` / `chatgpt`)
 
 <p align="center">
-  <img src="docs/images/cli-output.png" alt="Terminal output of claude-profile list" width="840">
+  <img src="docs/images/codex-profiles-row.png" alt="OpenAI Codex Default, Work, Extra Icons" width="100%" />
 </p>
 
+| Bản gốc (`ChatGPT / Codex.app`) | Bản Công ty (`Codex Work.app`) | Bản Phụ (`Codex Extra.app`) |
+| :---: | :---: | :---: |
+| <img src="docs/images/codex-default.png" width="160" alt="Codex Default" /> | <img src="docs/images/codex-work.png" width="160" alt="Codex Work" /> | <img src="docs/images/codex-extra.png" width="160" alt="Codex Extra" /> |
+| `~/.codex` | `~/.codex-profiles/work` | `~/.codex-profiles/extra` |
+
+### 3.4. xAI Grok Desktop Profiles (`grok`)
+
 <p align="center">
-  <img src="docs/images/isolated-signin.png" alt="Isolated Sign In Window" width="520">
+  <img src="docs/images/grok-profiles-row.png" alt="xAI Grok Default, Work, Extra Icons" width="100%" />
 </p>
+
+| Bản gốc (`Grok Bot.app`) | Bản Công ty (`Grok Work.app`) | Bản Phụ (`Grok Extra.app`) |
+| :---: | :---: | :---: |
+| <img src="docs/images/grok-default.png" width="160" alt="Grok Default" /> | <img src="docs/images/grok-work.png" width="160" alt="Grok Work" /> | <img src="docs/images/grok-extra.png" width="160" alt="Grok Extra" /> |
+| `~/.grok` + `~/.grokbot` | `~/.grok-profiles/work` | `~/.grok-profiles/extra` |
+
+### 3.5. Kết quả thực tế trong `~/Applications` & Màn hình đăng nhập độc lập
+
+| Hiển thị trong `~/Applications` (Finder) | Màn hình Sign-in độc lập khi khởi chạy |
+| :---: | :---: |
+| <img src="docs/images/finder-apps.png" width="420" alt="Finder ~/Applications" /> | <img src="docs/images/isolated-signin.png" width="420" alt="Isolated Sign-in Window" /> |
 
 ---
 
-## 4. Cài đặt & Sử dụng (Quickstart)
+## 4. Cài đặt & Sử dụng nhanh (Quickstart)
 
-### Bước 1: Cài đặt một lần (`Install once`)
+### Bước 1: Cài đặt bộ CLI (`ai-profile`) và Agent Skill
 
 ```bash
-git clone https://github.com/jangtrinh/claude-antigravity-multiprofile.git
-cd claude-antigravity-multiprofile
+git clone https://github.com/jangtrinh/multi-AI-profile.git
+cd multi-AI-profile
 ./install.sh
 ```
 
-*(Lệnh `./install.sh` sẽ cài `claude-profile` và `agy-profile` vào `~/.local/bin` đồng thời cài luôn Agent Skill `claude-multiprofile` vào `~/.claude/skills/` và `~/.gemini/config/skills/`).*
+*(Đảm bảo `~/.local/bin` đã có trong `PATH` của bạn, và máy đã cài đặt `Pillow` cho Python 3: `pip3 install --user Pillow`).*
 
-### Bước 2: Tạo Profile cho Claude Desktop
-
-```bash
-# Tạo app "Claude Work.app" với badge WORK màu xanh dương
-claude-profile create Work --color blue
-
-# Tạo app "Claude Extra.app" với badge EXTRA màu tím
-claude-profile create Extra --color purple
-
-# Xem danh sách tất cả profile & đường dẫn file claude_desktop_config.json
-claude-profile list
-
-# Xóa app profile (vẫn giữ nguyên dữ liệu đăng nhập & MCP config để an toàn)
-claude-profile delete Extra
-```
-
-### Bước 3: Tạo Profile cho Google Antigravity
+### Bước 2: Tạo các ứng dụng AI độc lập bằng `ai-profile`
 
 ```bash
-# Chế độ 1 (Mặc định): Tách tài khoản Google riêng + MCP riêng + Tự động symlink toàn bộ skills/agents/rules từ ~/.gemini
-agy-profile create Work --color blue
+# 1. Tạo các bản Work (nhãn màu xanh dương) cho Claude, Antigravity, Codex, Grok
+ai-profile create claude "Work" --color blue
+ai-profile create antigravity "Work" --color blue
+ai-profile create codex "Work" --color blue
+ai-profile create grok "Work" --color blue
 
-# Chế độ 2 (--share-auth): Dùng chung tài khoản Google hiện tại nhưng tách riêng cửa sổ & lịch sử hội thoại
-agy-profile create Extra --color purple --share-auth
+# 2. Tạo các bản Extra (nhãn màu tím)
+ai-profile create claude "Extra" --color purple
+ai-profile create antigravity "Extra" --color purple
+ai-profile create codex "Extra" --color purple
+ai-profile create grok "Extra" --color purple
 
-# Xem danh sách hoặc xóa app profile
-agy-profile list
-agy-profile delete Extra
+# 3. Tạo cho Cursor, Windsurf, Cline hoặc bất kỳ ứng dụng Electron/Chromium nào trên máy
+ai-profile create cursor "Work" --color emerald
+ai-profile create custom "Work" --app "/Applications/Perplexity.app" --color cyan
 ```
 
-**12 màu badge hỗ trợ sẵn:** `blue`, `purple`, `green`, `emerald`, `orange`, `amber`, `red`, `pink`, `cyan`, `teal`, `gray`, `dark`.
+*(Bạn cũng có thể dùng các lệnh tắt tương đương: `claude-profile`, `agy-profile`, `codex-profile`, `grok-profile`).*
+
+### Bước 3: Liệt kê hoặc gỡ bỏ Profile
+
+```bash
+# Xem toàn bộ danh sách các AI profile đang có trên máy và đường dẫn MCP/Config tương ứng
+ai-profile list
+
+# Xóa app khỏi ~/Applications (mặc định giữ lại dữ liệu đăng nhập an toàn)
+ai-profile remove codex "Extra"
+
+# Xóa cả app lẫn toàn bộ dữ liệu đăng nhập của profile đó
+ai-profile remove codex "Extra" --purge-data
+```
 
 ---
 
-## 5. Cơ chế hoạt động (Under the Hood)
+## 5. Bảng màu nhãn (Badge Color Presets)
 
-1. **APFS Copy-on-Write Clone (`cp -cR`):** Sao chép tức thời `/Applications/Claude.app` hoặc `/Applications/Antigravity.app` sang `~/Applications/<App> <Name>.app` ở tầng metadata của hệ thống file APFS (0 MB dung lượng phát sinh, hoàn tất dưới 1 giây).
-2. **Đổi tên Framework Helpers:** Electron trên macOS kiểm tra tên `Contents/Frameworks/<CFBundleDisplayName> Helper*.app`. Công cụ tự động đổi tên toàn bộ các Helper bundles (`GPU`, `Plugin`, `Renderer`, main helper) và cập nhật `Info.plist` bên trong để khớp với tên mới (`Claude Work`, `Antigravity Work`).
-3. **Biên dịch Native Mach-O `execv()` Launcher:** Thay vì dùng bash script dễ làm mất bundle context của macOS WindowServer, công cụ dùng `clang` biên dịch một binary Mach-O gọn nhẹ giữ nguyên PID và truyền `--user-data-dir` (cùng `--gemini_dir` cho `language_server` của Antigravity).
-4. **Tạo Icon `.icns` & Xóa `Assets.car`:** Trên macOS Sonoma/Sequoia, `Assets.car` và khóa `CFBundleIconName` trong `Info.plist` sẽ ghi đè file `.icns`. Công cụ tự động gỡ bỏ `Assets.car`, vẽ pill badge độ tương phản cao lên icon 1024x1024 gốc bằng Pillow, đóng gói thành bộ `.icns` chuẩn Retina qua `iconutil`, ký lại chữ ký ad-hoc (`codesign --force --deep --sign -`) và đăng ký ngay với `lsregister`.
+| Tên màu (`--color`) | Mã Hex chính | Gợi ý sử dụng |
+| :--- | :--- | :--- |
+| `blue` | `#1D4ED8` | Tài khoản Công ty (`Work`, `Corp`) |
+| `purple` | `#6D28D9` | Tài khoản Phụ / Dự án riêng (`Extra`, `Lab`) |
+| `emerald` | `#047857` | Tài khoản Khách hàng / Freelance (`Client`) |
+| `amber` | `#B45309` | Môi trường Staging / Testing (`Test`, `QA`) |
+| `rose` | `#BE123C` | Tài khoản Admin / Ops (`Admin`, `Root`) |
+| `cyan` | `#0E7490` | Tài khoản Nghiên cứu (`Research`) |
+| `slate` | `#334155` | Tài khoản Lưu trữ / Backup (`Archive`) |
+| `terracotta` | `#C2410C` | Tông màu cam đất truyền thống của Claude |
+
+---
+
+## 6. Tích hợp sẵn Agent Skill (`multi-ai-profile`)
+
+Sau khi chạy `./install.sh`, skill `multi-ai-profile` (và alias `claude-multiprofile`) sẽ tự động được cài vào `~/.claude/skills/` và `~/.gemini/config/skills/`. Từ nay, bên trong **Claude Code**, **Codex** hoặc **Antigravity**, bạn chỉ cần gõ tự nhiên:
+
+> *"Tạo thêm cho tôi 1 bản Codex tên là Client với icon màu emerald"*  
+> *"Tạo thêm 1 ứng dụng Grok Work màu blue"*
+
+Agent sẽ tự động gọi `ai-profile` và hoàn tất trong 2 giây mà không cần bạn nhớ cú pháp lệnh.
 
 ---
 
 ## License
 
-Released under the [MIT License](LICENSE). Created by [Jang Trịnh (@jangtrinh)](https://github.com/jangtrinh).
+Phát hành dưới giấy phép [MIT License](LICENSE).
