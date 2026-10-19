@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude &amp; Antigravity Multi-Profile — Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.</title>
+<meta name="description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<link rel="canonical" href="https://jangtrinh.github.io/claude-antigravity-multiprofile/">
+<link rel="alternate" type="text/plain" href="https://jangtrinh.github.io/claude-antigravity-multiprofile/llms.txt" title="LLM documentation">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Claude &amp; Antigravity Multi-Profile — Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.">
+<meta property="og:description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.">
+<meta property="og:url" content="https://jangtrinh.github.io/claude-antigravity-multiprofile/">
+<meta property="og:image" content="https://jangtrinh.github.io/claude-antigravity-multiprofile/images/cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claude &amp; Antigravity Multi-Profile — Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.">
+<meta name="twitter:description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.">
+<meta name="twitter:image" content="https://jangtrinh.github.io/claude-antigravity-multiprofile/images/cover.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "Claude & Antigravity Multi-Profile",
+      "description": "Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.",
+      "url": "https://jangtrinh.github.io/claude-antigravity-multiprofile/",
+      "codeRepository": "https://github.com/jangtrinh/claude-antigravity-multiprofile",
+      "license": "https://opensource.org/licenses/MIT",
+      "author": { "@type": "Person", "name": "jangtrinh", "url": "https://github.com/jangtrinh" },
+      "keywords": "claude desktop multiple accounts, google antigravity multiple accounts, macos multi-profile, mcp config per profile, alttab window name"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Why not just use osacompile or open -n -a Claude --args --user-data-dir?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Using open -n -a launches the original /Applications/Claude.app binary. As a result, macOS WindowServer, AltTab, Mission Control, and Cmd+Tab label every window identically as Claude with the exact same icon. By creating an APFS copy-on-write standalone bundle with its own CFBundleDisplayName, CFBundleIdentifier, renamed Framework Helpers, and Mach-O execv() launcher, macOS treats each profile as a first-class app (Claude Work, Claude Extra) with zero extra disk usage."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does cloning a 650MB Electron app waste disk space?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. On macOS APFS volumes, cp -cR performs an instant copy-on-write (clonefile) operation at the filesystem metadata level in under one second, consuming 0 MB of additional disk blocks for unchanged Electron frameworks."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Antigravity multi-profile isolation differ from Claude Desktop?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Claude Desktop is a single-layer Electron app where --user-data-dir isolates both login and claude_desktop_config.json. Google Antigravity has two layers: an Electron frontend and a Go backend (language_server). agy-profile wraps both binaries with native Mach-O launchers, passing --user-data-dir to Electron and --gemini_dir to language_server so each instance gets its own Google OAuth token (jetski-standalone-oauth-token) and MCP config while automatically symlinking your global GEMINI.md, skills, agents, and plugins."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it send telemetry or modify my original app?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Both claude-profile and agy-profile run 100% locally on your Mac, never touch /Applications/Claude.app or /Applications/Antigravity.app, and include zero network calls or telemetry."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What happens when I run delete on a profile?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Running claude-profile delete <Name> or agy-profile delete <Name> removes only the ~/Applications/<App>.app bundle while preserving your ~/Library/Application Support and ~/.gemini-profiles data directories so credentials, chat history, and MCP configs are never accidentally wiped."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="ds-skip-link" href="#main">Skip to content</a>
+<div class="ds-shell">
+  <nav class="ds-shell-nav" aria-label="Primary">
+    <a class="wordmark" href="https://github.com/jangtrinh">DESIGN:OS</a>
+    <div class="home-nav-links">
+      <a class="ds-tab" href="#why">Problem &amp; Solution</a>
+      <a class="ds-tab" href="#gallery">Logos &amp; Proof</a>
+      <a class="ds-tab" href="#install">Install</a>
+      <a class="ds-tab" href="#loop">CLI</a>
+      <a class="ds-tab" href="#faq">FAQ</a>
+      <a class="ds-tab" href="#ecosystem">Ecosystem</a>
+      <a class="ds-tab" href="https://github.com/jangtrinh/claude-antigravity-multiprofile"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>GitHub <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></a>
+    </div>
+  </nav>
+
+  <main id="main" class="ds-shell-main">
+    <!-- 1. HERO SECTION -->
+    <section aria-labelledby="title">
+      <p class="ds-heading eyebrow" data-level="3">MACOS AI WORKFLOW · MULTI-PROFILE · CLAUDE &amp; ANTIGRAVITY</p>
+      <h1 id="title" class="ds-heading" data-level="1">Run multiple isolated Claude Desktop and Google Antigravity accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.</h1>
+      <p class="lede">Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP configs, and AltTab/Mission Control window names for Claude Desktop and Google Antigravity.</p>
+
+      <p class="badges">
+        <a href="https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jangtrinh/claude-antigravity-multiprofile?style=for-the-badge" alt="License: MIT" height="28" onerror="this.onerror=null;this.hidden=true"></a>
+        <img src="https://img.shields.io/badge/platform-macOS_(APFS)-202020?style=for-the-badge" alt="Platform: macOS APFS" height="28">
+        <img src="https://img.shields.io/badge/targets-Claude_Desktop_%C2%B7_Antigravity-2563eb?style=for-the-badge" alt="Targets: Claude Desktop & Antigravity" height="28">
+        <img src="https://img.shields.io/badge/disk_overhead-0_MB_(CoW)-202020?style=for-the-badge" alt="Zero Disk Overhead" height="28">
+        <img src="https://img.shields.io/badge/telemetry-zero-202020?style=for-the-badge" alt="Zero Telemetry" height="28">
+      </p>
+
+      <div class="hero-actions">
+        <a class="ds-btn-pill" data-tone="solid" href="#install"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,128a8,8,0,0,1-3,6.25l-40,32a8,8,0,1,1-10-12.5L107.19,128,75,102.25a8,8,0,1,1,10-12.5l40,32A8,8,0,0,1,128,128Zm48,24H136a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm56-96V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Z"/></svg>Install once</a>
+        <a class="text-link" href="https://github.com/jangtrinh/claude-antigravity-multiprofile#readme"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Read the README on GitHub <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></a>
+      </div>
+
+      <figure class="ds-card branch-page-media">
+        <div class="ds-card-stage capture-stage">
+          <img src="images/cover.png" width="1200" height="630" alt="Claude Desktop and Google Antigravity badged profile icons and CLI overview" loading="eager">
+        </div>
+        <figcaption class="case-plate-caption">
+          <p>Six distinct macOS application bundles generated with 1 command: isolated accounts, separate MCP configs, and custom badged icons.</p>
+          <cite>macOS APFS · verified</cite>
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- 2. FACTS REGISTER -->
+    <section data-pace="tight" aria-labelledby="facts-h">
+      <h2 id="facts-h" class="ds-heading" data-level="3">What it is</h2>
+      <dl class="facts">
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Repository</dt><dd><a href="https://github.com/jangtrinh/claude-antigravity-multiprofile">jangtrinh/<wbr>claude-antigravity-multiprofile</a></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M223.68,66.15,135.68,18h0a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32h0l80.34,44L128,120,47.66,76ZM40,90l80,43.78v85.79L40,175.82Zm96,129.57V133.82L216,90v85.78Z"/></svg>Requires</dt><dd>macOS + Xcode CLI<small>Python 3 + Pillow + iconutil</small></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM80,84A12,12,0,1,1,68,72,12,12,0,0,1,80,84Zm40,0a12,12,0,1,1-12-12A12,12,0,0,1,120,84Z"/></svg>Interface</dt><dd><code>claude-profile</code> &amp; <code>agy-profile</code><small>CLI + Agent Skill</small></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M237.66,18.34a8,8,0,0,0-11.32,0l-52.4,52.41-5.37-5.38a32.05,32.05,0,0,0-45.26,0L100,88.69l-6.34-6.35A8,8,0,0,0,82.34,93.66L88.69,100,65.37,123.31a32,32,0,0,0,0,45.26l5.38,5.37-52.41,52.4a8,8,0,0,0,11.32,11.32l52.4-52.41,5.37,5.38a32,32,0,0,0,45.26,0L156,167.31l6.34,6.35a8,8,0,0,0,11.32-11.32L167.31,156l23.32-23.31a32,32,0,0,0,0-45.26l-5.38-5.37,52.41-52.4A8,8,0,0,0,237.66,18.34Zm-116.29,161a16,16,0,0,1-22.62,0L76.69,157.25a16,16,0,0,1,0-22.62L100,111.31,144.69,156Zm57.94-57.94L156,144.69,111.31,100l23.32-23.31a16,16,0,0,1,22.62,0l22.06,22A16,16,0,0,1,179.31,121.37ZM88.57,35A8,8,0,0,1,103.43,29l8,20A8,8,0,0,1,96.57,55ZM24.57,93A8,8,0,0,1,35,88.57l20,8A8,8,0,0,1,49,111.43l-20-8A8,8,0,0,1,24.57,93ZM231.43,163a8,8,0,0,1-10.4,4.46l-20-8A8,8,0,1,1,207,144.57l20,8A8,8,0,0,1,231.43,163Zm-64,58.06A8,8,0,0,1,152.57,227l-8-20A8,8,0,0,1,159.43,201Z"/></svg>Disk Overhead</dt><dd>0 MB Extra<small>APFS clonefile (<code>cp -cR</code>)</small></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,48H136V16a8,8,0,0,0-16,0V48H56A32,32,0,0,0,24,80V192a32,32,0,0,0,32,32H200a32,32,0,0,0,32-32V80A32,32,0,0,0,200,48Zm16,144a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V80A16,16,0,0,1,56,64H200a16,16,0,0,1,16,16Zm-52-56H92a28,28,0,0,0,0,56h72a28,28,0,0,0,0-56Zm-24,16v24H116V152ZM80,164a12,12,0,0,1,12-12h8v24H92A12,12,0,0,1,80,164Zm84,12h-8V152h8a12,12,0,0,1,0,24ZM72,108a12,12,0,1,1,12,12A12,12,0,0,1,72,108Zm88,0a12,12,0,1,1,12,12A12,12,0,0,1,160,108Z"/></svg>Telemetry</dt><dd>Zero Tracking<small>100% local execution</small></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M239.43,133l-32-80h0a8,8,0,0,0-9.16-4.84L136,62V40a8,8,0,0,0-16,0V65.58L54.26,80.19A8,8,0,0,0,48.57,85h0v.06L16.57,165a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32a7.92,7.92,0,0,0-.57-3L66.92,93.77,120,82V208H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V78.42L187,67.1,160.57,133a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32A7.92,7.92,0,0,0,239.43,133ZM56,184c-7.53,0-22.76-3.61-23.93-14.64L56,109.54l23.93,59.82C78.76,180.39,63.53,184,56,184Zm144-32c-7.53,0-22.76-3.61-23.93-14.64L200,77.54l23.93,59.82C222.76,148.39,207.53,152,200,152Z"/></svg>License</dt><dd>MIT</dd></div>
+      </dl>
+    </section>
+
+    <!-- 3. THE PROBLEM & HONEST COMPARISON SECTION -->
+    <section id="why" data-pace="chapter" aria-labelledby="why-h">
+      <h2 id="why-h" class="ds-heading" data-level="2">The Problem &amp; The Solution: Why standard wrapper scripts fail on macOS</h2>
+      <p>Engineers frequently use multiple accounts across <strong>Claude Desktop</strong> and <strong>Google Antigravity</strong> (Personal vs. Work/Enterprise, internal company MCP servers vs. personal MCP servers). A common workaround uses <code>osacompile</code> with <code>open -n -a "Claude" --args --user-data-dir=...</code>—which breaks window management because macOS still binds every window to the original <code>/Applications/Claude.app</code> bundle.</p>
+
+      <figure class="ds-card" style="margin-block:var(--s-12)">
+        <div class="ds-card-stage capture-stage">
+          <img src="images/window-switcher-problem.png" width="760" height="292" alt="AltTab window switcher showing two identical windows both labeled Claude" loading="lazy">
+        </div>
+        <figcaption class="case-plate-caption">
+          <p><strong>The Problem:</strong> With <code>open -n -a</code> wrappers, AltTab, Mission Control, and Cmd+Tab label every window identically as "Claude" with the exact same icon.</p>
+          <cite>osacompile wrapper limitation</cite>
+        </figcaption>
+      </figure>
+
+      <div class="register">
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M230.33,141.06a24.43,24.43,0,0,0-21.24-4.23l-41.84,9.62A28,28,0,0,0,140,112H89.94a31.82,31.82,0,0,0-22.63,9.37L44.69,144H16A16,16,0,0,0,0,160v40a16,16,0,0,0,16,16H120a7.93,7.93,0,0,0,1.94-.24l64-16a6.94,6.94,0,0,0,1.19-.4L226,182.82l.44-.2a24.6,24.6,0,0,0,3.93-41.56ZM16,160H40v40H16Zm203.43,8.21-38,16.18L119,200H56V155.31l22.63-22.62A15.86,15.86,0,0,1,89.94,128H140a12,12,0,0,1,0,24H112a8,8,0,0,0,0,16h32a8.32,8.32,0,0,0,1.79-.2l67-15.41.31-.08a8.6,8.6,0,0,1,6.3,15.9ZM164,96a36,36,0,0,0,5.9-.48,36,36,0,1,0,28.22-47A36,36,0,1,0,164,96Zm60-12a20,20,0,1,1-20-20A20,20,0,0,1,224,84ZM164,40a20,20,0,0,1,19.25,14.61,36,36,0,0,0-15,24.93A20.42,20.42,0,0,1,164,80a20,20,0,0,1,0-40Z"/></svg>
+          <h3>True Window &amp; Bundle Identity</h3>
+          <p>Clones the bundle via APFS <code>cp -cR</code> (0 MB disk overhead), renames <code>Contents/Frameworks/*Helper*.app</code>, sets a dedicated <code>CFBundleDisplayName</code> &amp; <code>CFBundleIdentifier</code>, and compiles a native Mach-O <code>execv()</code> launcher so AltTab, Mission Control, and Cmd+Tab show <strong>Claude Work</strong>, <strong>Claude Extra</strong>, and <strong>Antigravity Work</strong>.</p>
+        </div>
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M224,128a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM104,72H216a8,8,0,0,0,0-16H104a8,8,0,0,0,0,16ZM216,184H104a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM43.58,55.16,48,52.94V104a8,8,0,0,0,16,0V40a8,8,0,0,0-11.58-7.16l-16,8a8,8,0,0,0,7.16,14.32ZM79.77,156.72a23.73,23.73,0,0,0-9.6-15.95,24.86,24.86,0,0,0-34.11,4.7,23.63,23.63,0,0,0-3.57,6.46,8,8,0,1,0,15,5.47,7.84,7.84,0,0,1,1.18-2.13,8.76,8.76,0,0,1,12-1.59A7.91,7.91,0,0,1,63.93,159a7.64,7.64,0,0,1-1.57,5.78,1,1,0,0,0-.08.11L33.59,203.21A8,8,0,0,0,40,216H72a8,8,0,0,0,0-16H56l19.08-25.53A23.47,23.47,0,0,0,79.77,156.72Z"/></svg>
+          <h3>Auto-Badged Native <code>.icns</code> Icons</h3>
+          <p>Extracts the official 1024x1024 app icon, composites a high-contrast pill badge (<code>WORK</code>, <code>EXTRA</code>, <code>DEV</code>) in 12 color themes, strips <code>Assets.car</code> override catalogs, and compiles a multi-resolution <code>.icns</code> via macOS <code>iconutil</code>.</p>
+        </div>
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></svg>
+          <h3>Dual-Layer Antigravity Isolation + Shared Skills</h3>
+          <p>Wraps both Antigravity's Electron binary (<code>--user-data-dir</code>) and its Go <code>language_server</code> (<code>--gemini_dir</code>), isolating Google OAuth tokens (<code>jetski-standalone-oauth-token</code>) and <code>mcp_config.json</code> while symlinking your global <code>GEMINI.md</code>, <code>skills</code>, <code>agents</code>, and <code>plugins</code>.</p>
+        </div>
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></svg>
+          <h3>Isolated Per-Profile MCP Configs</h3>
+          <p>Attach internal company Jira/Confluence/Database MCP servers strictly to your <code>Work</code> profile without leaking credentials or polluting context in your <code>Personal</code> or <code>Extra</code> profiles.</p>
+        </div>
+      </div>
+
+      <div class="aside">
+        <p><strong>Where native in-app account switchers win, and it is not close:</strong> When an application ships a built-in multi-workspace switcher that supports simultaneous side-by-side windows with distinct MCP toolchains, zero bundle cloning is needed. Until Claude Desktop and Antigravity support simultaneous multi-account windows natively, APFS bundle cloning is the cleanest macOS solution.</p>
+      </div>
+    </section>
+
+    <!-- 4. GALLERY SHOWCASE: DISCRETE LOGO CARDS & REAL PROOF -->
+    <section id="gallery" data-pace="chapter" aria-labelledby="gallery-h">
+      <h2 id="gallery-h" class="ds-heading" data-level="2">Generated App Logos &amp; Visual Proof</h2>
+      <p>Every profile receives a discrete, multi-resolution macOS <code>.icns</code> icon with a color-coded pill badge so you can distinguish instances immediately in the Dock, Spotlight, AltTab, and Mission Control.</p>
+
+      <ul class="projects">
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/claude-default.png" width="512" height="512" alt="Claude Default App Icon" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Claude (Default)</h3>
+              <p>Original <code>/Applications/Claude.app</code> bound to Profile 1 at <code>~/Library/Application Support/Claude</code>.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/claude-work.png" width="512" height="512" alt="Claude Work App Icon with blue WORK badge" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Claude Work</h3>
+              <p>Generated via <code>claude-profile create Work --color blue</code> with isolated MCP config at <code>Claude-Work/</code>.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/claude-extra.png" width="512" height="512" alt="Claude Extra App Icon with purple EXTRA badge" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Claude Extra</h3>
+              <p>Generated via <code>claude-profile create Extra --color purple</code> with isolated MCP config at <code>Claude-Extra/</code>.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/agy-default.png" width="512" height="512" alt="Google Antigravity Default App Icon" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Antigravity (Default)</h3>
+              <p>Original <code>/Applications/Antigravity.app</code> using default <code>~/.gemini</code> and primary Google OAuth token.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/agy-work.png" width="512" height="512" alt="Antigravity Work App Icon with blue WORK badge" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Antigravity Work</h3>
+              <p>Generated via <code>agy-profile create Work --color blue</code>. Isolated OAuth &amp; state + symlinked global skills.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/agy-extra.png" width="512" height="512" alt="Antigravity Extra App Icon with purple EXTRA badge" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Antigravity Extra</h3>
+              <p>Generated via <code>agy-profile create Extra --color purple</code>. Supports <code>--share-auth</code> or isolated OAuth.</p>
+            </div>
+          </article>
+        </li>
+        <li class="featured">
+          <article class="ds-card project-card featured">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/finder-apps.png" width="1200" height="574" alt="macOS Finder showing Claude Extra and Claude Work in ~/Applications with badged icons" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Native macOS Bundles in <code>~/Applications</code></h3>
+              <p>Each generated app registers with macOS LaunchServices (<code>lsregister</code>) so Spotlight, Raycast, Dock, and AltTab display its custom name and badged icon immediately.</p>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/isolated-signin.png" width="600" height="600" alt="Isolated Sign In window for a newly created Claude profile" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Clean Isolated Sign-In</h3>
+              <p>Launching a new profile opens a fresh authentication session without touching your active windows.</p>
+            </div>
+          </article>
+        </li>
+        <li style="grid-column: span 2">
+          <article class="ds-card project-card">
+            <div class="ds-card-stage capture-stage">
+              <img src="images/cli-output.png" width="1000" height="620" alt="Terminal output of claude-profile list showing installed profiles and MCP paths" loading="lazy">
+            </div>
+            <div class="project-body">
+              <h3>Deterministic CLI Inspection</h3>
+              <p>Inspect all installed profiles, bundle paths, and dedicated <code>claude_desktop_config.json</code> / <code>.gemini-profiles</code> locations with <code>claude-profile list</code> and <code>agy-profile list</code>.</p>
+            </div>
+          </article>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 5. QUICKSTART & INSTALLATION -->
+    <section id="install" data-pace="chapter" aria-labelledby="install-h">
+      <h2 id="install-h" class="ds-heading" data-level="2">Install once</h2>
+      <p>Clone the repository and run the installer to place <code>claude-profile</code> and <code>agy-profile</code> in <code>~/.local/bin</code> (plus install the agent skill for Claude Code and Antigravity).</p>
+<pre class="ds-code"><code>git clone https://github.com/jangtrinh/claude-antigravity-multiprofile.git
+cd claude-antigravity-multiprofile
+./install.sh</code></pre>
+    </section>
+
+    <!-- 6. FIRST SAFE USE -->
+    <section data-pace="tight" aria-labelledby="first-h">
+      <h2 id="first-h" class="ds-heading" data-level="3">First safe use</h2>
+      <ol class="steps">
+        <li>List existing Claude Desktop and Google Antigravity profiles on your Mac (read-only).
+<pre class="ds-code"><code>claude-profile list
+agy-profile list</code></pre></li>
+        <li>Create isolated <code>Work</code> profiles with blue badged icons for both Claude Desktop and Antigravity.
+<pre class="ds-code"><code>claude-profile create Work --color blue
+agy-profile create Work --color blue</code></pre></li>
+        <li>Create an additional <code>Extra</code> profile (or pass <code>--share-auth</code> on Antigravity to share your primary Google login while isolating windows and chat history).
+<pre class="ds-code"><code>claude-profile create Extra --color purple
+agy-profile create Extra --color purple --share-auth</code></pre></li>
+      </ol>
+      <p>Supported badge colors: <code>blue</code>, <code>purple</code>, <code>green</code>, <code>emerald</code>, <code>orange</code>, <code>amber</code>, <code>red</code>, <code>pink</code>, <code>cyan</code>, <code>teal</code>, <code>gray</code>, <code>dark</code>.</p>
+    </section>
+
+    <!-- 7. PRACTICAL LOOP -->
+    <section id="loop" aria-labelledby="loop-h">
+      <h2 id="loop-h" class="ds-heading" data-level="2">A practical loop</h2>
+      <div class="register">
+        <div class="register-row" data-icon="none">
+          <h3><code>create &lt;Name&gt;</code></h3>
+          <p>APFS-clones the base app to <code>~/Applications/</code>, renames framework helpers, compiles the native Mach-O launcher, generates the badged <code>.icns</code>, and initializes isolated MCP config files.</p>
+        </div>
+        <div class="register-row" data-icon="none">
+          <h3><code>--share-auth</code></h3>
+          <p>Available in <code>agy-profile create</code>: shares your default <code>~/.gemini/jetski-standalone-oauth-token</code> while isolating window identity and <code>~/.gemini/antigravity-&lt;slug&gt;</code> state.</p>
+        </div>
+        <div class="register-row" data-icon="none">
+          <h3><code>list</code></h3>
+          <p>Prints every installed profile bundle alongside its exact user data directory and <code>claude_desktop_config.json</code> or <code>.gemini-profiles</code> path.</p>
+        </div>
+        <div class="register-row" data-icon="none">
+          <h3><code>delete &lt;Name&gt;</code></h3>
+          <p>Removes the <code>~/Applications/&lt;App&gt;.app</code> bundle cleanly while preserving your user data and MCP configurations on disk.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. FAQ SECTION (1:1 with JSON-LD FAQPage for AEO) -->
+    <section id="faq" class="faq" data-pace="chapter" aria-labelledby="faq-h">
+      <h2 id="faq-h" class="ds-heading" data-level="2">Frequently asked questions</h2>
+      <details>
+        <summary>Why not just use osacompile or open -n -a Claude --args --user-data-dir? <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>Using open -n -a launches the original /Applications/Claude.app binary. As a result, macOS WindowServer, AltTab, Mission Control, and Cmd+Tab label every window identically as Claude with the exact same icon. By creating an APFS copy-on-write standalone bundle with its own CFBundleDisplayName, CFBundleIdentifier, renamed Framework Helpers, and Mach-O execv() launcher, macOS treats each profile as a first-class app (Claude Work, Claude Extra) with zero extra disk usage.</p>
+      </details>
+      <details>
+        <summary>Does cloning a 650MB Electron app waste disk space? <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>No. On macOS APFS volumes, cp -cR performs an instant copy-on-write (clonefile) operation at the filesystem metadata level in under one second, consuming 0 MB of additional disk blocks for unchanged Electron frameworks.</p>
+      </details>
+      <details>
+        <summary>How does Antigravity multi-profile isolation differ from Claude Desktop? <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>Claude Desktop is a single-layer Electron app where --user-data-dir isolates both login and claude_desktop_config.json. Google Antigravity has two layers: an Electron frontend and a Go backend (language_server). agy-profile wraps both binaries with native Mach-O launchers, passing --user-data-dir to Electron and --gemini_dir to language_server so each instance gets its own Google OAuth token (jetski-standalone-oauth-token) and MCP config while automatically symlinking your global GEMINI.md, skills, agents, and plugins.</p>
+      </details>
+      <details>
+        <summary>Does it send telemetry or modify my original app? <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>No. Both claude-profile and agy-profile run 100% locally on your Mac, never touch /Applications/Claude.app or /Applications/Antigravity.app, and include zero network calls or telemetry.</p>
+      </details>
+      <details>
+        <summary>What happens when I run delete on a profile? <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>Running claude-profile delete &lt;Name&gt; or agy-profile delete &lt;Name&gt; removes only the ~/Applications/&lt;App&gt;.app bundle while preserving your ~/Library/Application Support and ~/.gemini-profiles data directories so credentials, chat history, and MCP configs are never accidentally wiped.</p>
+      </details>
+    </section>
+
+    <!-- 9. ECOSYSTEM & RELATED PROJECTS -->
+    <section id="ecosystem" class="ecosystem" data-pace="chapter" aria-labelledby="ecosystem-h">
+      <h2 id="ecosystem-h" class="ds-heading" data-level="3">Ecosystem &amp; Related Projects</h2>
+      <p class="lede" style="margin-bottom:var(--s-6);color:var(--c-gray-1000)">Explore companion developer tools and AI agent workflows in the DESIGN:OS open-source suite.</p>
+      <div class="link-list">
+        <a class="ds-icon-row" href="https://jangtrinh.github.io/design-os/">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.34,44-29.77,16.3-80.35-44ZM128,120,47.66,76l33.9-18.56,80.34,44ZM40,90l80,43.78v85.79L40,175.82Zm176,85.78h0l-80,43.79V133.82l32-17.51V152a8,8,0,0,0,16,0V107.55L216,90v85.77Z"/></svg>
+          <span class="ds-icon-row-label">DESIGN:OS — Agentic design and engineering operating system</span>
+          <span class="ds-icon-row-meta">suite</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+        <a class="ds-icon-row" href="https://jangtrinh.github.io/design-os-code2flow/">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V184a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,144H40V56H216V184ZM176,88a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,88Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,120Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,152Z"/></svg>
+          <span class="ds-icon-row-label">DESIGN:OS Code2Flow — AST codebase-to-user-flow mapper and 11-heuristic UX auditor</span>
+          <span class="ds-icon-row-meta">cli</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+        <a class="ds-icon-row" href="https://jangtrinh.github.io/design-os-figma-plugin/">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,48H136V16a8,8,0,0,0-16,0V48H56A32,32,0,0,0,24,80V192a32,32,0,0,0,32,32H200a32,32,0,0,0,32-32V80A32,32,0,0,0,200,48Zm16,144a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V80A16,16,0,0,1,56,64H200a16,16,0,0,1,16,16Z"/></svg>
+          <span class="ds-icon-row-label">Ease Design Figma Agent — Deterministic CLI bridge for Figma design systems</span>
+          <span class="ds-icon-row-meta">plugin</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- 10. READ NEXT -->
+    <section aria-labelledby="read-h">
+      <h2 id="read-h" class="ds-heading" data-level="3">Read next</h2>
+      <div class="link-list">
+        <a class="ds-icon-row" href="https://github.com/jangtrinh/claude-antigravity-multiprofile#readme">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>
+          <span class="ds-icon-row-label">README: Full Vietnamese &amp; English Architecture Guide</span>
+          <span class="ds-icon-row-meta">github</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+        <a class="ds-icon-row" href="https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/skills/claude-multiprofile/SKILL.md">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V184a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,144H40V56H216V184Z"/></svg>
+          <span class="ds-icon-row-label">SKILL.md: Agent Skill specification for Claude Code &amp; Antigravity</span>
+          <span class="ds-icon-row-meta">skill</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+        <a class="ds-icon-row" href="https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/LICENSE">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M239.43,133l-32-80h0a8,8,0,0,0-9.16-4.84L136,62V40a8,8,0,0,0-16,0V65.58L54.26,80.19A8,8,0,0,0,48.57,85h0v.06L16.57,165a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32a7.92,7.92,0,0,0-.57-3L66.92,93.77,120,82V208H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V78.42L187,67.1,160.57,133a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32A7.92,7.92,0,0,0,239.43,133ZM56,184c-7.53,0-22.76-3.61-23.93-14.64L56,109.54l23.93,59.82C78.76,180.39,63.53,184,56,184Zm144-32c-7.53,0-22.76-3.61-23.93-14.64L200,77.54l23.93,59.82C222.76,148.39,207.53,152,200,152Z"/></svg>
+          <span class="ds-icon-row-label">MIT License: Permissive open source rights</span>
+          <span class="ds-icon-row-meta">license</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="ds-shell-footer">
+    <div class="ds-shell-footer-inner">
+      <a class="wordmark" href="https://github.com/jangtrinh">DESIGN:OS</a>
+      <nav class="ds-shell-footer-nav" aria-label="Footer">
+        <a class="ds-tab" href="https://github.com/jangtrinh/claude-antigravity-multiprofile"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>GitHub</a>
+        <a class="ds-tab" href="https://github.com/jangtrinh/claude-antigravity-multiprofile/blob/main/LICENSE">MIT</a>
+        <a class="ds-tab" href="#main">Back to top</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="jangtrinh" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF813F" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jangtrinh.github.io/claude-antigravity-multiprofile/sitemap.xml

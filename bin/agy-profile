@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+import sys
+import os
+import shutil
+import subprocess
+import argparse
+from pathlib import Path
+
+COLOR_MAP = {
+    "blue": (30, 100, 220, 240),
+    "purple": (140, 50, 200, 240),
+    "green": (22, 140, 85, 240),
+    "emerald": (16, 140, 90, 240),
+    "orange": (220, 100, 20, 240),
+    "amber": (210, 115, 25, 240),
+    "red": (205, 45, 60, 240),
+    "pink": (215, 60, 140, 240),
+    "cyan": (14, 130, 160, 240),
+    "teal": (20, 130, 120, 240),
+    "gray": (85, 85, 95, 240),
+    "dark": (40, 40, 45, 245)
+}
+
+HOME = Path.home()
+AGY_ORIG = Path("/Applications/Antigravity.app")
+APPLICATIONS = HOME / "Applications"
+APP_SUPPORT = HOME / "Library" / "Application Support"
+DEFAULT_GEMINI_DIR = HOME / ".gemini"
+PROFILES_GEMINI_ROOT = HOME / ".gemini-profiles"
+
+def generate_badged_icon(text, color_rgb, output_icns, preview_png=None):
+    from PIL import Image, ImageDraw, ImageFont
+
+    tmp_dir = Path("/tmp/agy_profile_icon_build")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    base_png = tmp_dir / "base.png"
+
+    subprocess.run([
+        "sips", "-s", "format", "png",
+        str(AGY_ORIG / "Contents" / "Resources" / "icon.icns"),
+        "--out", str(base_png)
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    base_img = Image.open(base_png).convert("RGBA").resize((1024, 1024), Image.Resampling.LANCZOS)
+    W, H = base_img.size
+
+    font = None
+    for fp in [
+        "/System/Library/Fonts/SFPro-Bold.ttf",
+        "/System/Library/Fonts/SFNS.ttf",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf"
+    ]:
+        if os.path.exists(fp):
+            try:
+                size = 130 if len(text) <= 5 else max(80, 130 - (len(text) - 5) * 12)
+                font = ImageFont.truetype(fp, size)
+                break
+            except Exception:
+                pass
+    if font is None:
+        font = ImageFont.load_default()
+
+    draw = ImageDraw.Draw(base_img)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+
+    bw = tw + 90
+    bh = th + 54
+    bx = (W - bw) // 2
+    by = H - bh - 70
+
+    shadow_img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow_img)
+    s_draw.rounded_rectangle([bx - 6, by + 4, bx + bw + 6, by + bh + 14], radius=32, fill=(0, 0, 0, 160))
+    base_img = Image.alpha_composite(base_img, shadow_img)
+
+    draw = ImageDraw.Draw(base_img)
+    draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=28, fill=color_rgb)
+    draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=28, outline=(255, 255, 255, 220), width=6)
+
+    tx = bx + (bw - tw) // 2 - bbox[0]
+    ty = by + (bh - th) // 2 - bbox[1] - 4
+    draw.text((tx, ty), text, font=font, fill=(255, 255, 255, 255))
+
+    if preview_png:
+        base_img.save(preview_png)
+
+    if output_icns:
+        iconset_dir = tmp_dir / "icon.iconset"
+        iconset_dir.mkdir(parents=True, exist_ok=True)
+        sizes = [16, 32, 64, 128, 256, 512, 1024]
+        for s in sizes:
+            if s <= 512:
+                resized = base_img.resize((s, s), Image.Resampling.LANCZOS)
+                resized.save(iconset_dir / f"icon_{s}x{s}.png")
+            if s >= 32:
+                half = s // 2
+                resized2x = base_img.resize((s, s), Image.Resampling.LANCZOS)
+                resized2x.save(iconset_dir / f"icon_{half}x{half}@2x.png")
+
+        subprocess.run(["iconutil", "-c", "icns", str(iconset_dir), "-o", str(output_icns)], check=True)
+    shutil.rmtree(tmp_dir)
+
+def setup_isolated_gemini_dir(profile_gemini_dir: Path):
+    """Creates an isolated .gemini directory for a profile while symlinking shared skills/rules/plugins."""
+    profile_gemini_dir.mkdir(parents=True, exist_ok=True)
+    (profile_gemini_dir / "config").mkdir(parents=True, exist_ok=True)
+    (profile_gemini_dir / "antigravity").mkdir(parents=True, exist_ok=True)
+
+    # Symlink shared global instructions & skills/agents/plugins from ~/.gemini
+    shared_root_items = ["GEMINI.md", ".env", "skills"]
+    for item in shared_root_items:
+        src = DEFAULT_GEMINI_DIR / item
+        dst = profile_gemini_dir / item
+        if src.exists() and not dst.exists() and not dst.is_symlink():
+            dst.symlink_to(src)
+
+    shared_config_items = ["skills", "agents", "plugins", "hooks", "config.json"]
+    for item in shared_config_items:
+        src = DEFAULT_GEMINI_DIR / "config" / item
+        dst = profile_gemini_dir / "config" / item
+        if src.exists() and not dst.exists() and not dst.is_symlink():
+            dst.symlink_to(src)
+
+    # Independent MCP config (seeded from existing if not present)
+    mcp_cfg = profile_gemini_dir / "config" / "mcp_config.json"
+    orig_mcp = DEFAULT_GEMINI_DIR / "config" / "mcp_config.json"
+    if not mcp_cfg.exists():
+        if orig_mcp.exists():
+            shutil.copy(orig_mcp, mcp_cfg)
+        else:
+            mcp_cfg.write_text('{\n  "mcpServers": {}\n}\n')
+
+    agy_mcp_link = profile_gemini_dir / "antigravity" / "mcp_config.json"
+    if not agy_mcp_link.exists() and not agy_mcp_link.is_symlink():
+        agy_mcp_link.symlink_to(mcp_cfg)
+
+    for sub in ["mcp", "builtin", "bin"]:
+        src = DEFAULT_GEMINI_DIR / "antigravity" / sub
+        dst = profile_gemini_dir / "antigravity" / sub
+        if src.exists() and not dst.exists() and not dst.is_symlink():
+            dst.symlink_to(src)
+
+def create_profile(name, color_name="blue", share_auth=False):
+    clean_name = name.strip()
+    slug = clean_name.lower().replace(" ", "-")
+    app_display_name = f"Antigravity {clean_name}"
+    bundle_id = f"com.google.antigravity.{slug}"
+    target_app = APPLICATIONS / f"{app_display_name}.app"
+    electron_data_dir = APP_SUPPORT / f"Antigravity-{clean_name.replace(' ', '-')}"
+
+    if share_auth:
+        gemini_dir = DEFAULT_GEMINI_DIR
+        ls_app_data_dir = f"antigravity-{slug}"
+        (DEFAULT_GEMINI_DIR / ls_app_data_dir).mkdir(parents=True, exist_ok=True)
+    else:
+        gemini_dir = PROFILES_GEMINI_ROOT / clean_name.replace(" ", "-")
+        ls_app_data_dir = "antigravity"
+        setup_isolated_gemini_dir(gemini_dir)
+
+    print(f"==> Building '{app_display_name}.app' ({'Shared Google Auth' if share_auth else 'Isolated Google Auth'})...")
+    electron_data_dir.mkdir(parents=True, exist_ok=True)
+
+    if target_app.exists():
+        shutil.rmtree(target_app)
+    subprocess.run(["cp", "-cR", str(AGY_ORIG), str(target_app)], check=True)
+
+    # Rename Helper apps
+    frameworks_dir = target_app / "Contents" / "Frameworks"
+    for f in frameworks_dir.glob("Antigravity Helper*.app"):
+        new_f_name = f.name.replace("Antigravity", app_display_name)
+        new_f = frameworks_dir / new_f_name
+        f.rename(new_f)
+        inner_macos = new_f / "Contents" / "MacOS"
+        for b in inner_macos.iterdir():
+            b.rename(inner_macos / new_f.stem)
+            break
+        plist = new_f / "Contents" / "Info.plist"
+        if plist.exists():
+            for key in ["CFBundleDisplayName", "CFBundleName", "CFBundleExecutable"]:
+                subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :{key} '{new_f.stem}'", str(plist)], stderr=subprocess.DEVNULL)
+
+    # Configure main Info.plist
+    main_plist = target_app / "Contents" / "Info.plist"
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :CFBundleDisplayName '{app_display_name}'", str(main_plist)], check=True)
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :CFBundleName '{app_display_name}'", str(main_plist)], check=True)
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :CFBundleIdentifier '{bundle_id}'", str(main_plist)], check=True)
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Delete :CFBundleIconName", str(main_plist)], stderr=subprocess.DEVNULL)
+
+    assets_car = target_app / "Contents" / "Resources" / "Assets.car"
+    if assets_car.exists():
+        assets_car.unlink()
+
+    # Custom icon
+    color_rgb = COLOR_MAP.get(color_name.lower(), COLOR_MAP["blue"])
+    generate_badged_icon(clean_name.upper(), color_rgb, target_app / "Contents" / "Resources" / "icon.icns")
+
+    # 1. Native Mach-O wrapper for Contents/MacOS/Antigravity
+    macos_dir = target_app / "Contents" / "MacOS"
+    orig_bin = macos_dir / "Antigravity"
+    real_bin = macos_dir / "Antigravity.real"
+    orig_bin.rename(real_bin)
+
+    fe_c = f"""#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <libgen.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
+
+int main(int argc, char *argv[]) {{
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) != 0) return 1;
+    char *dir = dirname(path);
+    char real_bin[PATH_MAX];
+    snprintf(real_bin, sizeof(real_bin), "%s/Antigravity.real", dir);
+
+    const char *home = getenv("HOME");
+    char user_data[PATH_MAX];
+    snprintf(user_data, sizeof(user_data), "--user-data-dir=%s/Library/Application Support/Antigravity-{clean_name.replace(' ', '-')}", home);
+
+    char **new_argv = malloc((argc + 2) * sizeof(char *));
+    new_argv[0] = real_bin;
+    new_argv[1] = user_data;
+    for (int i = 1; i < argc; i++) {{
+        new_argv[i + 1] = argv[i];
+    }}
+    new_argv[argc + 1] = NULL;
+
+    execv(real_bin, new_argv);
+    return 0;
+}}
+"""
+    tmp_fe_c = Path(f"/tmp/agy_fe_{slug}.c")
+    tmp_fe_c.write_text(fe_c)
+    subprocess.run(["clang", "-O2", str(tmp_fe_c), "-o", str(orig_bin)], check=True)
+    orig_bin.chmod(0o755)
+    real_bin.chmod(0o755)
+    tmp_fe_c.unlink(missing_ok=True)
+
+    # 2. Native Mach-O wrapper for Contents/Resources/bin/language_server
+    ls_dir = target_app / "Contents" / "Resources" / "bin"
+    ls_orig = ls_dir / "language_server"
+    ls_real = ls_dir / "language_server.real"
+    ls_orig.rename(ls_real)
+
+    ls_c = f"""#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <libgen.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
+
+int main(int argc, char *argv[]) {{
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) != 0) return 1;
+    char *dir = dirname(path);
+    char real_bin[PATH_MAX];
+    snprintf(real_bin, sizeof(real_bin), "%s/language_server.real", dir);
+
+    char **new_argv = malloc((argc + 5) * sizeof(char *));
+    int k = 0;
+    new_argv[k++] = real_bin;
+    for (int i = 1; i < argc; i++) {{
+        if (strcmp(argv[i], "--app_data_dir") == 0 && i + 1 < argc) {{
+            new_argv[k++] = "--app_data_dir";
+            new_argv[k++] = "{ls_app_data_dir}";
+            i++;
+        }} else {{
+            new_argv[k++] = argv[i];
+        }}
+    }}
+    new_argv[k++] = "--gemini_dir";
+    new_argv[k++] = "{gemini_dir}";
+    new_argv[k] = NULL;
+
+    execv(real_bin, new_argv);
+    return 0;
+}}
+"""
+    tmp_ls_c = Path(f"/tmp/agy_ls_{slug}.c")
+    tmp_ls_c.write_text(ls_c)
+    subprocess.run(["clang", "-O2", str(tmp_ls_c), "-o", str(ls_orig)], check=True)
+    ls_orig.chmod(0o755)
+    ls_real.chmod(0o755)
+    tmp_ls_c.unlink(missing_ok=True)
+
+    # Sign and register
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(target_app)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", "-f", "-r", str(target_app)], check=True)
+    target_app.touch()
+
+    print(f"[✓] Created {target_app}")
+    print(f"    - UI Data Dir: {electron_data_dir}")
+    print(f"    - Gemini Dir:  {gemini_dir}")
+    print(f"    - App Data:    {gemini_dir / ls_app_data_dir}")
+
+def list_profiles():
+    print("=== Antigravity Profiles ===")
+    print("0. Antigravity (Default)")
+    print("   - App: /Applications/Antigravity.app")
+    print(f"   - Gemini Dir: {DEFAULT_GEMINI_DIR}")
+    idx = 1
+    for app in sorted(APPLICATIONS.glob("Antigravity *.app")):
+        name = app.stem.replace("Antigravity ", "")
+        dash_name = name.replace(" ", "-")
+        print(f"\n{idx}. {app.stem}")
+        print(f"   - App: {app}")
+        print(f"   - UI Data: {APP_SUPPORT / f'Antigravity-{dash_name}'}")
+        print(f"   - Isolated Gemini Dir: {PROFILES_GEMINI_ROOT / dash_name}")
+        idx += 1
+
+def delete_profile(name):
+    clean_name = name.strip()
+    target_app = APPLICATIONS / f"Antigravity {clean_name}.app"
+    if target_app.exists():
+        shutil.rmtree(target_app)
+        print(f"[✓] Deleted app: {target_app}")
+    else:
+        print(f"[!] App not found: {target_app}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Manage isolated Antigravity instances with custom names, badged icons, and isolated/shared auth.")
+    subparsers = parser.add_subparsers(dest="command")
+
+    cp = subparsers.add_parser("create", help="Create a new Antigravity profile app")
+    cp.add_argument("name", help="Profile name (e.g. Work, Extra)")
+    cp.add_argument("--color", default="blue", choices=list(COLOR_MAP.keys()), help="Badge color")
+    cp.add_argument("--share-auth", action="store_true", help="Share Google Account login with default Antigravity while isolating windows & conversation state")
+
+    subparsers.add_parser("list", help="List installed Antigravity profiles")
+
+    dp = subparsers.add_parser("delete", help="Delete an Antigravity profile app")
+    dp.add_argument("name", help="Profile name")
+
+    args = parser.parse_args()
+    if args.command == "create":
+        create_profile(args.name, args.color, args.share_auth)
+    elif args.command == "list":
+        list_profiles()
+    elif args.command == "delete":
+        delete_profile(args.name)
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()
