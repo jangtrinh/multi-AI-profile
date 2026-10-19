@@ -525,7 +525,7 @@ def cmd_list(args):
 
         # Identify if it's one of our cloned profiles (has *Real or *-bin executable in Contents/MacOS)
         macos_dir = app / "Contents/MacOS"
-        real_bins = (list(macos_dir.glob("*Real")) + list(macos_dir.glob("*-bin"))) if macos_dir.exists() else []
+        real_bins = (list(macos_dir.glob("*Real")) + list(macos_dir.glob("*.real")) + list(macos_dir.glob("*-bin"))) if macos_dir.exists() else []
         if not real_bins:
             continue
 

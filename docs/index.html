@@ -1,383 +1,324 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS</title>
-  <meta name="description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP &amp; CLI configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex/ChatGPT, xAI Grok, and any Electron AI app." />
-  <link rel="canonical" href="https://jangtrinh.github.io/multi-AI-profile/" />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS" />
-  <meta property="og:description" content="Run multiple isolated Claude Desktop, Google Antigravity, OpenAI Codex, and xAI Grok accounts on macOS with custom window names, badged Dock icons, separate MCP/CLI configs, and zero disk overhead." />
-  <meta property="og:url" content="https://jangtrinh.github.io/multi-AI-profile/" />
-  <meta property="og:image" content="https://jangtrinh.github.io/multi-AI-profile/images/cover.png" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS" />
-  <meta name="twitter:description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher for Claude, Antigravity, Codex, Grok, Cursor, and Windsurf." />
-  <meta name="twitter:image" content="https://jangtrinh.github.io/multi-AI-profile/images/cover.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./assets/site.css" />
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "SoftwareApplication",
-        "name": "multi-AI-profile",
-        "operatingSystem": "macOS (APFS)",
-        "applicationCategory": "DeveloperApplication",
-        "license": "https://opensource.org/licenses/MIT",
-        "url": "https://jangtrinh.github.io/multi-AI-profile/",
-        "codeRepository": "https://github.com/jangtrinh/multi-AI-profile",
-        "description": "Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP/CLI configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex, xAI Grok, and any Electron AI app.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
-      },
-      {
-        "@type": "FAQPage",
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "Tại sao không dùng osacompile và open -n -a --args --user-data-dir?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Cách dùng osacompile chỉ tạo một script mồi mở lại tiến trình gốc trong /Applications/. Do macOS WindowServer, AltTab và Mission Control đọc tên cửa sổ và icon từ Info.plist của tiến trình đang chạy (kèm các Helper apps và Assets.car), tất cả các cửa sổ đều bị trùng tên và trùng icon."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Nhân bản nguyên một file .app nặng hàng trăm MB có làm đầy ổ cứng không?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Không. Công cụ sử dụng cờ cp -cR (APFS Copy-on-Write clonefile) trên macOS, giúp bản sao dùng chung các data blocks vật lý với ứng dụng gốc. Dung lượng ổ cứng tăng thêm là 0 MB và quá trình clone hoàn tất dưới 1 giây."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Làm sao OpenAI Codex, xAI Grok và Google Antigravity tách biệt được cả tiến trình ngầm và CLI?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "ai-profile biên dịch một Mach-O binary wrapper cho từng nền tảng: với Antigravity sẽ bọc cả Antigravity UI (--user-data-dir) và Go language_server (--gemini_dir, --app_data_dir); với Codex/ChatGPT sẽ tiêm CODEX_HOME và CODEX_ELECTRON_USER_DATA_PATH; với Grok sẽ tiêm GROK_HOME, SAND_DATA_ROOT và SAND_USER_DATA_DIR."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Mỗi profile có dùng riêng được cấu hình MCP Server không?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Có 100%. Mỗi profile có một thư mục dữ liệu và file cấu hình MCP độc lập (claude_desktop_config.json cho Claude, mcp_config.json cho Antigravity, config.toml cho Codex và Grok), cho phép gắn MCP nội bộ công ty vào bản Work mà không ảnh hưởng đến bản Personal."
-            }
-          }
-        ]
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS</title>
+<meta name="description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP &amp; CLI configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex/ChatGPT, xAI Grok, and any Electron AI app.">
+<meta name="author" content="Jang Trinh">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://jangtrinh.github.io/multi-AI-profile/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DESIGN:OS">
+<meta property="og:title" content="Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS">
+<meta property="og:description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP &amp; CLI configs, and AltTab/Mission Control window names for Claude, Antigravity, Codex, Grok, and any AI app.">
+<meta property="og:url" content="https://jangtrinh.github.io/multi-AI-profile/">
+<meta property="og:image" content="https://jangtrinh.github.io/multi-AI-profile/images/cover.png">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="980">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Multi-AI-Profile — Isolated Claude, Antigravity, Codex &amp; Grok Apps on macOS">
+<meta name="twitter:description" content="Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher for Claude, Antigravity, Codex, Grok, Cursor, and Windsurf.">
+<meta name="twitter:image" content="https://jangtrinh.github.io/multi-AI-profile/images/cover.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "multi-AI-profile",
+      "operatingSystem": "macOS (APFS)",
+      "applicationCategory": "DeveloperApplication",
+      "license": "https://opensource.org/licenses/MIT",
+      "url": "https://jangtrinh.github.io/multi-AI-profile/",
+      "codeRepository": "https://github.com/jangtrinh/multi-AI-profile",
+      "description": "Instant APFS copy-on-write macOS bundle cloner and Mach-O launcher that isolates accounts, MCP/CLI configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex, xAI Grok, and any Electron AI app.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
       }
-    ]
-  }
-  </script>
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Why not just use osacompile and open -n -a --args --user-data-dir?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AppleScript wrappers exit immediately after spawning the original /Applications/ bundle. Because macOS WindowServer, AltTab, and Mission Control read CFBundleName and icons from the active process's Info.plist, Helper apps, and Assets.car, every window still displays the same name and unbadged icon."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does cloning a 400 MB .app bundle waste disk space?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. ai-profile uses cp -cR (APFS Copy-on-Write clonefile) on macOS, sharing physical storage blocks with the source application. Disk overhead is 0 MB and cloning completes in under 1 second."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How are background daemons and CLI homes isolated for Antigravity, Codex, and Grok?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ai-profile compiles native Mach-O binary wrappers per platform: Antigravity wraps both the UI (--user-data-dir) and Go language_server (--gemini_dir, --app_data_dir); OpenAI Codex/ChatGPT injects CODEX_HOME and CODEX_ELECTRON_USER_DATA_PATH; xAI Grok injects GROK_HOME, SAND_DATA_ROOT, and SAND_USER_DATA_DIR."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="container topbar-inner">
-      <a class="brand" href="#top" aria-label="multi-AI-profile Home">
-        <span class="brand-mark">MULTI-AI-PROFILE</span>
-      </a>
-      <nav class="topnav" aria-label="Primary">
-        <a href="#problem-solution">Problem &amp; Solution</a>
-        <a href="#showcase">Logos &amp; Proof</a>
-        <a href="#install">Install</a>
-        <a href="#cli">CLI</a>
-        <a href="#faq">FAQ</a>
-        <a class="topnav-cta" href="https://github.com/jangtrinh/multi-AI-profile" target="_blank" rel="noopener">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-          <span>GitHub</span>
-          <span class="ext-glyph" aria-hidden="true">↗</span>
-        </a>
-      </nav>
+<a class="ds-skip-link" href="#main">Skip to content</a>
+<div class="ds-shell">
+  <nav class="ds-shell-nav" aria-label="Primary">
+    <a class="wordmark" href="https://github.com/jangtrinh">DESIGN:OS</a>
+    <div class="home-nav-links">
+      <a class="ds-tab" href="#why">Problem &amp; Solution</a>
+      <a class="ds-tab" href="#gallery">Logos &amp; Proof</a>
+      <a class="ds-tab" href="#install">Install</a>
+      <a class="ds-tab" href="#loop">CLI</a>
+      <a class="ds-tab" href="#faq">FAQ</a>
+      <a class="ds-tab" href="#ecosystem">Ecosystem</a>
+      <a class="ds-tab" href="https://github.com/jangtrinh/multi-AI-profile"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>GitHub <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></a>
     </div>
-  </header>
+  </nav>
 
-  <main id="top">
-    <!-- 1. HERO -->
-    <section class="hero">
-      <div class="container">
-        <div class="kicker">MACOS AI WORKFLOW · CLAUDE · ANTIGRAVITY · CODEX · GROK · ANY APP</div>
-        <h1>Run multiple isolated Claude, Antigravity, Codex &amp; Grok accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.</h1>
-        <p class="lead">Instant APFS copy-on-write macOS bundle cloner and native Mach-O launcher that isolates accounts, background daemons, CLI homes, MCP configs, and AltTab/Mission Control window names.</p>
-        <div class="shields" aria-label="Project metadata">
-          <span class="shield"><span class="k">license</span><span class="v v-green">MIT</span></span>
-          <span class="shield"><span class="k">platform</span><span class="v v-dark">macOS (APFS)</span></span>
-          <span class="shield"><span class="k">targets</span><span class="v v-blue">Claude · Antigravity · Codex · Grok · Any App</span></span>
-          <span class="shield"><span class="k">disk overhead</span><span class="v v-dark">0 MB (CoW)</span></span>
-          <span class="shield"><span class="k">telemetry</span><span class="v v-dark">zero</span></span>
-        </div>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#install">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 2.75A1.25 1.25 0 0 1 2.75 1.5h10.5a1.25 1.25 0 0 1 1.25 1.25v10.5a1.25 1.25 0 0 1-1.25 1.25H2.75a1.25 1.25 0 0 1-1.25-1.25V2.75Zm2.72 2.47a.75.75 0 0 0-1.06 1.06L4.94 8 3.16 9.72a.75.75 0 1 0 1.06 1.06l2.25-2.25a.75.75 0 0 0 0-1.06L4.22 5.22ZM7.75 9.5a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5h-3.5Z"/></svg>
-            <span>Install once</span>
-          </a>
-          <a class="btn btn-ghost" href="https://github.com/jangtrinh/multi-AI-profile" target="_blank" rel="noopener">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-            <span>Read the README on GitHub</span>
-            <span class="ext-glyph" aria-hidden="true">↗</span>
-          </a>
-        </div>
-        <figure class="hero-media">
-          <img src="./images/cover.png" alt="Claude Desktop, Google Antigravity, OpenAI Codex, and xAI Grok isolated profiles with custom WORK and EXTRA badges" />
-        </figure>
+  <main id="main" class="ds-shell-main">
+    <!-- 1. HERO SECTION -->
+    <section aria-labelledby="title">
+      <p class="ds-heading eyebrow" data-level="3">MACOS AI WORKFLOW · CLAUDE · ANTIGRAVITY · CODEX · GROK · ANY APP</p>
+      <h1 id="title" class="ds-heading" data-level="1">Run multiple isolated Claude, Antigravity, Codex, and Grok accounts on macOS with custom window names, badged Dock icons, and zero disk overhead.</h1>
+      <p class="lede">Instant APFS copy-on-write macOS bundle cloner and native Mach-O launcher that isolates accounts, background daemons, CLI homes, MCP configs, and AltTab/Mission Control window names.</p>
+
+      <p class="badges">
+        <a href="https://github.com/jangtrinh/multi-AI-profile/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jangtrinh/multi-AI-profile?style=for-the-badge" alt="License: MIT" height="28" onerror="this.onerror=null;this.hidden=true"></a>
+        <img src="https://img.shields.io/badge/platform-macOS_(APFS)-202020?style=for-the-badge" alt="Platform: macOS APFS" height="28">
+        <img src="https://img.shields.io/badge/targets-Claude_%C2%B7_Antigravity_%C2%B7_Codex_%C2%B7_Grok-2563eb?style=for-the-badge" alt="Targets: Claude, Antigravity, Codex, Grok" height="28">
+        <img src="https://img.shields.io/badge/disk_overhead-0_MB_(CoW)-202020?style=for-the-badge" alt="Zero Disk Overhead" height="28">
+        <img src="https://img.shields.io/badge/telemetry-zero-202020?style=for-the-badge" alt="Zero Telemetry" height="28">
+      </p>
+
+      <div class="hero-actions">
+        <a class="ds-btn-pill" data-tone="solid" href="#install"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,128a8,8,0,0,1-3,6.25l-40,32a8,8,0,1,1-10-12.5L107.19,128,75,102.25a8,8,0,1,1,10-12.5l40,32A8,8,0,0,1,128,128Zm48,24H136a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm56-96V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Z"/></svg>Install once</a>
+        <a class="text-link" href="https://github.com/jangtrinh/multi-AI-profile#readme"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Read the README on GitHub <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></a>
       </div>
+
+      <figure class="ds-card branch-page-media">
+        <div class="ds-card-stage capture-stage">
+          <img src="images/cover.png" width="1600" height="980" alt="Claude Desktop, Google Antigravity, OpenAI Codex, and xAI Grok badged profile icons" loading="eager">
+        </div>
+        <figcaption class="case-plate-caption">
+          <p>Twelve distinct macOS application bundles across Claude, Antigravity, Codex, and Grok: isolated accounts, separate MCP/CLI configs, and custom badged icons.</p>
+          <cite>macOS APFS · verified</cite>
+        </figcaption>
+      </figure>
     </section>
 
-    <!-- 2. PROBLEM & SOLUTION -->
-    <section id="problem-solution" class="section">
-      <div class="container">
-        <div class="section-head">
-          <div class="kicker">01 · NHU CẦU &amp; GIẢI PHÁP KIẾN TRÚC</div>
-          <h2>Vì sao cách dùng <code>osacompile</code> bị lỗi trùng tên cửa sổ, và cách <code>multi-AI-profile</code> xử lý tận gốc.</h2>
-          <p class="section-sub">Khi chạy nhiều tài khoản (Cá nhân, Công ty, Dự án phụ) trên Claude, Antigravity, Codex hay Grok, bạn cần phân biệt tức thì trong AltTab / Mission Control và tách biệt hoàn toàn cấu hình MCP Server lẫn CLI Home.</p>
-        </div>
+    <!-- 2. FACTS REGISTER -->
+    <section data-pace="tight" aria-labelledby="facts-h">
+      <h2 id="facts-h" class="ds-heading" data-level="3">What it is</h2>
+      <dl class="facts">
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Repository</dt><dd><a href="https://github.com/jangtrinh/multi-AI-profile">jangtrinh/<wbr>multi-AI-profile</a></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M223.68,66.15,135.68,18h0a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32h0l80.34,44L128,120,47.66,76ZM40,90l80,43.78v85.79L40,175.82Zm96,129.57V133.82L216,90v85.78Z"/></svg>Requires</dt><dd>macOS + Xcode CLI<small>Python 3 + Pillow + iconutil</small></dd></div>
+        <div><dt><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM80,84A12,12,0,1,1,68,72,12,12,0,0,1,80,84Zm40,0a12,12,0,1,1-12-12A12,12,0,0,1,120,84Z"/></svg>Interface</dt><dd><code>ai-profile</code> + 4 shortcuts<small>CLI + Agent Skill</small></dd></div>
+      </dl>
+    </section>
 
-        <div class="grid-3">
-          <article class="card">
-            <div class="card-num">01 · VẤN ĐỀ VỚI OSACOMPILE</div>
-            <h3>Trùng tên &amp; trùng icon trong AltTab</h3>
-            <p>Script <code>open -n -a "Claude" --args --user-data-dir=...</code> chỉ là trình mồi rồi thoát ngay. Cửa sổ thật vẫn chạy từ tiến trình gốc trong <code>/Applications/</code> nên macOS WindowServer hiển thị cả 3 cửa sổ cùng tên và cùng icon (hoặc bị <code>Assets.car</code> đè icon).</p>
-          </article>
-          <article class="card">
-            <div class="card-num">02 · APFS COW + MACH-O WRAPPER</div>
-            <h3>0 MB ổ cứng · Tên cửa sổ riêng biệt</h3>
-            <p>Dùng <code>cp -cR</code> (APFS Copy-on-Write) nhân bản bundle trong &lt;1 giây với 0 MB tốn thêm, patch <code>Info.plist</code> + toàn bộ Framework Helpers, xóa <code>Assets.car</code> override và biên dịch thực thi Mach-O <code>execv()</code> chính chủ.</p>
-          </article>
-          <article class="card">
-            <div class="card-num">03 · MULTI-LAYER AI ISOLATION</div>
-            <h3>Cô lập cả UI, Daemon &amp; CLI Home</h3>
-            <p>Tách riêng cả tầng Electron UI lẫn tầng Daemon/CLI bên dưới: <code>CLAUDE_CONFIG_DIR</code> cho Claude, <code>--gemini_dir</code> cho Go <code>language_server</code> của Antigravity, <code>CODEX_HOME</code> cho OpenAI Codex, và <code>GROK_HOME</code> + <code>SAND_DATA_ROOT</code> cho xAI Grok.</p>
-          </article>
-        </div>
+    <!-- 3. PROBLEM & SOLUTION -->
+    <section id="why" data-pace="chapter" aria-labelledby="why-h">
+      <h2 id="why-h" class="ds-heading" data-level="2">Why <code>osacompile</code> fails in AltTab — and how APFS bundle cloning solves it</h2>
+      <p>Creating an AppleScript wrapper via <code>osacompile -e 'do shell script "open -n -a Claude --args --user-data-dir=..."'</code> only launches a transient shim that exits immediately while the real window runs inside the original <code>/Applications/</code> process. macOS WindowServer, AltTab, and Mission Control read window titles and icons from the active process's <code>Info.plist</code> and <code>Assets.car</code>, causing every window to share the exact same name and icon.</p>
 
-        <div class="table-wrap" style="margin-top: 32px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Hạng mục so sánh</th>
-                <th>Cách cũ (<code>osacompile</code> / <code>open -n -a</code>)</th>
-                <th>Giải pháp <code>multi-AI-profile</code></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Tên cửa sổ trong AltTab / Mission Control</strong></td>
-                <td>Bị trùng tên gốc (<code>Claude</code>, <code>Antigravity</code>, <code>ChatGPT</code>, <code>Grok Bot</code>)</td>
-                <td><strong>Tên riêng biệt</strong> (<code>Claude Work</code>, <code>Antigravity Work</code>, <code>Codex Work</code>, <code>Grok Work</code>)</td>
-              </tr>
-              <tr>
-                <td><strong>Icon trên Dock / Spotlight / Cmd+Tab</strong></td>
-                <td>Trùng icon gốc hoặc bị <code>Assets.car</code> của macOS Sequoia đè lại</td>
-                <td><strong>Tự động gỡ <code>Assets.car</code> &amp; đóng dấu Pill Badge</strong> (<code>WORK</code>, <code>EXTRA</code>) nét căng</td>
-              </tr>
-              <tr>
-                <td><strong>Dung lượng ổ cứng tốn thêm</strong></td>
-                <td>0 MB</td>
-                <td><strong>0 MB</strong> nhờ cơ chế APFS Copy-on-Write (<code>cp -cR</code>)</td>
-              </tr>
-              <tr>
-                <td><strong>Cách ly tiến trình ngầm &amp; CLI Home</strong></td>
-                <td>Dùng chung <code>~/.gemini</code>, <code>~/.codex</code>, <code>~/.grok</code>, <code>~/.grokbot</code></td>
-                <td><strong>Cô lập hoàn toàn</strong> (<code>CLAUDE_CONFIG_DIR</code>, <code>--gemini_dir</code>, <code>CODEX_HOME</code>, <code>GROK_HOME</code>)</td>
-              </tr>
-              <tr>
-                <td><strong>Cấu hình MCP Server</strong></td>
-                <td>Dễ lẫn lộn khi cấu hình thủ công</td>
-                <td><strong>Khởi tạo sẵn file cấu hình riêng</strong> cho từng profile (An toàn cho MCP nội bộ công ty)</td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="register">
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200Z"/></svg>
+          <h3>0 MB APFS Copy-on-Write Clone</h3>
+          <p>Clones any <code>.app</code> bundle into <code>~/Applications/</code> in under 1 second via <code>cp -cR</code> (APFS <code>clonefile</code>), sharing physical data blocks with 0 MB disk overhead.</p>
+        </div>
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z"/></svg>
+          <h3>Multi-Layer Daemon &amp; CLI Home Isolation</h3>
+          <p>Compiles native universal Mach-O launchers that isolate both Electron UI (<code>--user-data-dir</code>) and platform daemons/CLIs: <code>CLAUDE_CONFIG_DIR</code> for Claude, <code>--gemini_dir</code> for Antigravity's Go <code>language_server</code>, <code>CODEX_HOME</code> for OpenAI Codex, and <code>GROK_HOME</code> + <code>SAND_DATA_ROOT</code> for xAI Grok.</p>
+        </div>
+        <div class="register-row">
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" data-size="20"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Z"/></svg>
+          <h3>Normalized 1024×1024 Badged Icons &amp; <code>Assets.car</code> Strip</h3>
+          <p>Normalizes every icon to 1024×1024, composites a high-contrast pill badge (<code>WORK</code>, <code>EXTRA</code>), strips <code>CFBundleIconName</code> and <code>Assets.car</code> so macOS Sequoia never overrides the badged <code>.icns</code>, and activates the hidden official Codex Dark (<code>&gt;_</code>) icon for Codex profiles.</p>
         </div>
       </div>
     </section>
 
-    <!-- 3. LOGO & PROOF SHOWCASE -->
-    <section id="showcase" class="section section-alt">
-      <div class="container">
-        <div class="section-head">
-          <div class="kicker">02 · LOGO &amp; VISUAL PROOF SHOWCASE</div>
-          <h2>Bộ sưu tập Logo cho Claude, Antigravity, Codex &amp; Grok và bằng chứng thực tế trên macOS.</h2>
-          <p class="section-sub">Tất cả icon từ mọi hãng đều được chuẩn hóa về độ phân giải <code>1024×1024</code> trước khi render nhãn màu để kích thước chữ đồng bộ tuyệt đối trên thanh Dock.</p>
-        </div>
+    <!-- 4. GALLERY SHOWCASE -->
+    <section id="gallery" data-pace="chapter" aria-labelledby="gallery-h">
+      <h2 id="gallery-h" class="ds-heading" data-level="2">Generated App Logos Across All 4 Flagship AI Platforms</h2>
+      <p>Every profile receives a discrete, multi-resolution macOS <code>.icns</code> icon with a color-coded pill badge so you can distinguish instances immediately in the Dock, Spotlight, AltTab, and Mission Control.</p>
 
-        <h3 style="margin-bottom: 16px;">1. Claude Desktop Profiles (<code>claude</code>)</h3>
-        <figure class="showcase-figure">
-          <img src="./images/claude-profiles-row.png" alt="Claude Desktop Default, Work, Extra Icons" />
-          <figcaption>Bộ 3 ứng dụng Claude Desktop: Bản gốc (Personal), <code>Claude Work.app</code> (Blue Badge) và <code>Claude Extra.app</code> (Purple Badge).</figcaption>
-        </figure>
-
-        <h3 style="margin: 36px 0 16px;">2. Google Antigravity Profiles (<code>antigravity</code> / <code>agy</code>)</h3>
-        <figure class="showcase-figure">
-          <img src="./images/antigravity-profiles-row.png" alt="Google Antigravity Default, Work, Extra Icons" />
-          <figcaption>Bộ 3 ứng dụng Google Antigravity: Bản gốc (Personal), <code>Antigravity Work.app</code> (Blue Badge) và <code>Antigravity Extra.app</code> (Purple Badge).</figcaption>
-        </figure>
-
-        <h3 style="margin: 36px 0 16px;">3. OpenAI Codex / ChatGPT Profiles (<code>codex</code> / <code>chatgpt</code>)</h3>
-        <figure class="showcase-figure">
-          <img src="./images/codex-profiles-row.png" alt="OpenAI Codex Default, Work, Extra Icons" />
-          <figcaption>Bộ 3 ứng dụng OpenAI Codex Desktop: Tự động kích hoạt icon Codex Dark (<code>&gt;_</code>) chính chủ từ <code>ChatGPT.app</code> kèm nhãn <code>WORK</code> và <code>EXTRA</code>, cô lập riêng <code>CODEX_HOME</code>.</figcaption>
-        </figure>
-
-        <h3 style="margin: 36px 0 16px;">4. xAI Grok Desktop Profiles (<code>grok</code>)</h3>
-        <figure class="showcase-figure">
-          <img src="./images/grok-profiles-row.png" alt="xAI Grok Default, Work, Extra Icons" />
-          <figcaption>Bộ 3 ứng dụng xAI Grok Desktop: Chuẩn hóa icon lên <code>1024×1024</code> sắc nét kèm nhãn <code>WORK</code> và <code>EXTRA</code>, cô lập đồng thời <code>GROK_HOME</code> và <code>SAND_DATA_ROOT</code>.</figcaption>
-        </figure>
-
-        <div class="grid-2" style="margin-top: 36px;">
-          <figure class="showcase-figure" style="margin: 0;">
-            <img src="./images/finder-apps.png" alt="Finder ~/Applications showing isolated apps" />
-            <figcaption>Hiển thị trực quan trong <code>~/Applications</code>, Spotlight và thanh Dock.</figcaption>
-          </figure>
-          <figure class="showcase-figure" style="margin: 0;">
-            <img src="./images/isolated-signin.png" alt="Isolated Sign-in Window" />
-            <figcaption>Mỗi ứng dụng mở ra một phiên đăng nhập độc lập hoàn toàn với tài khoản gốc.</figcaption>
-          </figure>
-        </div>
-      </div>
+      <ul class="projects">
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/claude-default.png" width="512" height="512" alt="Claude Default App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Claude (Default)</h3><p>Original <code>/Applications/Claude.app</code> bound to <code>~/Library/Application Support/Claude</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/claude-work.png" width="512" height="512" alt="Claude Work App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Claude Work</h3><p><code>ai-profile create claude Work --color blue</code> · Isolated MCP &amp; <code>CLAUDE_CONFIG_DIR</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/claude-extra.png" width="512" height="512" alt="Claude Extra App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Claude Extra</h3><p><code>ai-profile create claude Extra --color purple</code> · Side-project Claude account.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/agy-default.png" width="512" height="512" alt="Antigravity Default App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Antigravity (Default)</h3><p>Original <code>/Applications/Antigravity.app</code> bound to default <code>~/.gemini</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/agy-work.png" width="512" height="512" alt="Antigravity Work App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Antigravity Work</h3><p><code>ai-profile create antigravity Work --color blue</code> · Dual-layer Go <code>language_server</code> isolation.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/agy-extra.png" width="512" height="512" alt="Antigravity Extra App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Antigravity Extra</h3><p><code>ai-profile create antigravity Extra --color purple</code> · Isolated <code>~/.gemini-profiles/extra</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/codex-default.png" width="512" height="512" alt="OpenAI Codex Default App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Codex (Default)</h3><p>Official OpenAI Codex Dark icon extracted from <code>/Applications/ChatGPT.app</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/codex-work.png" width="512" height="512" alt="Codex Work App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Codex Work</h3><p><code>ai-profile create codex Work --color blue</code> · Isolated <code>CODEX_HOME</code> (<code>~/.codex-profiles/work</code>).</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/codex-extra.png" width="512" height="512" alt="Codex Extra App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Codex Extra</h3><p><code>ai-profile create codex Extra --color purple</code> · Separate <code>config.toml</code> &amp; <code>auth.json</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/grok-default.png" width="512" height="512" alt="Grok Default App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Grok (Default)</h3><p>Original <code>/Applications/Grok Bot.app</code> bound to <code>~/.grok</code> and <code>~/.grokbot</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/grok-work.png" width="512" height="512" alt="Grok Work App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Grok Work</h3><p><code>ai-profile create grok Work --color blue</code> · Isolated <code>GROK_HOME</code> &amp; <code>SAND_DATA_ROOT</code>.</p></div>
+          </article>
+        </li>
+        <li>
+          <article class="ds-card project-card" data-fit="contain">
+            <div class="ds-card-stage capture-stage"><img src="images/grok-extra.png" width="512" height="512" alt="Grok Extra App Icon" loading="lazy"></div>
+            <div class="project-body"><h3>Grok Extra</h3><p><code>ai-profile create grok Extra --color purple</code> · Separate Grok daemon &amp; auth state.</p></div>
+          </article>
+        </li>
+      </ul>
     </section>
 
-    <!-- 4. INSTALL -->
-    <section id="install" class="section">
-      <div class="container">
-        <div class="section-head">
-          <div class="kicker">03 · ONE-TIME INSTALL</div>
-          <h2>Cài đặt một lần trong 10 giây.</h2>
-          <p class="section-sub">Cài đặt đồng thời lệnh tổng <code>ai-profile</code>, 4 lệnh tắt (<code>claude-profile</code>, <code>agy-profile</code>, <code>codex-profile</code>, <code>grok-profile</code>) vào <code>~/.local/bin</code> và tích hợp sẵn Agent Skill.</p>
-        </div>
-
-        <div class="code-card">
-          <div class="code-card-head">
-            <span>Terminal — macOS (zsh / bash)</span>
-            <button class="copy-btn" data-copy="git clone https://github.com/jangtrinh/multi-AI-profile.git&#10;cd multi-AI-profile&#10;./install.sh">Copy</button>
-          </div>
-          <pre><code>git clone https://github.com/jangtrinh/multi-AI-profile.git
+    <!-- 5. INSTALL -->
+    <section id="install" data-pace="chapter" aria-labelledby="install-h">
+      <h2 id="install-h" class="ds-heading" data-level="2">One-Time Install</h2>
+      <p>Installs the universal <code>ai-profile</code> CLI, convenience shortcuts (<code>claude-profile</code>, <code>agy-profile</code>, <code>codex-profile</code>, <code>grok-profile</code>), and the <code>multi-ai-profile</code> Agent Skill.</p>
+      <pre class="ds-code"><code>git clone https://github.com/jangtrinh/multi-AI-profile.git
 cd multi-AI-profile
 ./install.sh</code></pre>
-        </div>
-      </div>
     </section>
 
-    <!-- 5. CLI REFERENCE -->
-    <section id="cli" class="section section-alt">
-      <div class="container">
-        <div class="section-head">
-          <div class="kicker">04 · CLI REFERENCE &amp; COLOR PRESETS</div>
-          <h2>Tạo thêm bất kỳ profile nào chỉ với 1 dòng lệnh.</h2>
-        </div>
-
-        <div class="code-card">
-          <div class="code-card-head">
-            <span>Usage Examples</span>
-            <button class="copy-btn" data-copy="ai-profile create claude &quot;Work&quot; --color blue&#10;ai-profile create antigravity &quot;Work&quot; --color blue&#10;ai-profile create codex &quot;Work&quot; --color blue&#10;ai-profile create grok &quot;Work&quot; --color blue&#10;ai-profile list">Copy</button>
-          </div>
-          <pre><code># 1. Tạo các bản Work (nhãn xanh dương) cho cả 4 nền tảng AI
+    <!-- 6. CLI USAGE -->
+    <section id="loop" data-pace="chapter" aria-labelledby="loop-h">
+      <h2 id="loop-h" class="ds-heading" data-level="2">CLI Usage &amp; Targets</h2>
+      <pre class="ds-code"><code># Create Work profiles (blue badge) across all 4 AI platforms
 ai-profile create claude "Work" --color blue
 ai-profile create antigravity "Work" --color blue
 ai-profile create codex "Work" --color blue
 ai-profile create grok "Work" --color blue
 
-# 2. Tạo các bản Extra (nhãn tím)
+# Create Extra profiles (purple badge)
 ai-profile create claude "Extra" --color purple
 ai-profile create antigravity "Extra" --color purple
 ai-profile create codex "Extra" --color purple
 ai-profile create grok "Extra" --color purple
 
-# 3. Tạo cho Cursor, Windsurf, Cline hoặc bất kỳ ứng dụng .app nào trên máy
+# Or clone Cursor, Windsurf, Cline, or any custom macOS .app
 ai-profile create cursor "Work" --color emerald
 ai-profile create custom "Work" --app "/Applications/Perplexity.app" --color cyan
 
-# 4. Liệt kê hoặc gỡ bỏ profile
+# List or remove profiles
 ai-profile list
 ai-profile remove codex "Extra"</code></pre>
-        </div>
-
-        <div class="table-wrap" style="margin-top: 28px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Preset (<code>--color</code>)</th>
-                <th>Mã màu Hex</th>
-                <th>Gợi ý sử dụng</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>blue</code></td><td><code>#1D4ED8</code></td><td>Tài khoản Công ty (<code>Work</code>, <code>Corp</code>)</td></tr>
-              <tr><td><code>purple</code></td><td><code>#6D28D9</code></td><td>Tài khoản Phụ / Dự án riêng (<code>Extra</code>, <code>Lab</code>)</td></tr>
-              <tr><td><code>emerald</code></td><td><code>#047857</code></td><td>Tài khoản Khách hàng / Freelance (<code>Client</code>)</td></tr>
-              <tr><td><code>amber</code></td><td><code>#B45309</code></td><td>Môi trường Staging / Testing (<code>Test</code>, <code>QA</code>)</td></tr>
-              <tr><td><code>rose</code></td><td><code>#BE123C</code></td><td>Tài khoản Admin / Ops (<code>Admin</code>)</td></tr>
-              <tr><td><code>cyan</code></td><td><code>#0E7490</code></td><td>Tài khoản Nghiên cứu (<code>Research</code>)</td></tr>
-              <tr><td><code>slate</code></td><td><code>#334155</code></td><td>Tài khoản Lưu trữ (<code>Archive</code>)</td></tr>
-              <tr><td><code>terracotta</code></td><td><code>#C2410C</code></td><td>Tông cam đất đặc trưng của Claude</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </section>
 
-    <!-- 6. FAQ -->
-    <section id="faq" class="section">
-      <div class="container">
-        <div class="section-head">
-          <div class="kicker">05 · FREQUENTLY ASKED QUESTIONS</div>
-          <h2>Câu hỏi thường gặp.</h2>
-        </div>
+    <!-- 7. FAQ -->
+    <section id="faq" class="faq" data-pace="chapter" aria-labelledby="faq-h">
+      <h2 id="faq-h" class="ds-heading" data-level="2">Frequently Asked Questions</h2>
+      <details open>
+        <summary>Why not just use osacompile and open -n -a --args --user-data-dir?<svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>AppleScript wrappers exit immediately after spawning the original <code>/Applications/</code> bundle. Because macOS WindowServer, AltTab, and Mission Control read <code>CFBundleName</code> and icons from the active process's <code>Info.plist</code>, Helper apps, and <code>Assets.car</code>, every window still displays the same name and unbadged icon.</p>
+      </details>
+      <details>
+        <summary>Does cloning a 400 MB .app bundle waste disk space?<svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p>No. <code>ai-profile</code> uses <code>cp -cR</code> (APFS Copy-on-Write clonefile) on macOS, sharing physical storage blocks with the source application. Disk overhead is 0 MB and cloning completes in under 1 second.</p>
+      </details>
+      <details>
+        <summary>How are background daemons and CLI homes isolated for Antigravity, Codex, and Grok?<svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg></summary>
+        <p><code>ai-profile</code> compiles native Mach-O binary wrappers per platform: Antigravity wraps both the UI (<code>--user-data-dir</code>) and Go <code>language_server</code> (<code>--gemini_dir</code>, <code>--app_data_dir</code>); OpenAI Codex/ChatGPT injects <code>CODEX_HOME</code> and <code>CODEX_ELECTRON_USER_DATA_PATH</code>; xAI Grok injects <code>GROK_HOME</code>, <code>SAND_DATA_ROOT</code>, and <code>SAND_USER_DATA_DIR</code>.</p>
+      </details>
+    </section>
 
-        <div class="faq-list">
-          <details class="faq-item" open>
-            <summary>Tại sao không dùng osacompile và open -n -a --args --user-data-dir?</summary>
-            <p>Cách dùng <code>osacompile</code> chỉ tạo một script mồi mở lại tiến trình gốc trong <code>/Applications/</code>. Do macOS WindowServer, AltTab và Mission Control đọc tên cửa sổ và icon từ <code>Info.plist</code> của tiến trình đang chạy (kèm các Helper apps và <code>Assets.car</code>), tất cả các cửa sổ đều bị trùng tên và trùng icon.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Nhân bản nguyên một file .app nặng hàng trăm MB có làm đầy ổ cứng không?</summary>
-            <p>Không. Công cụ sử dụng cờ <code>cp -cR</code> (APFS Copy-on-Write clonefile) trên macOS, giúp bản sao dùng chung các data blocks vật lý với ứng dụng gốc. Dung lượng ổ cứng tăng thêm là <strong>0 MB</strong> và quá trình clone hoàn tất dưới 1 giây.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Làm sao OpenAI Codex, xAI Grok và Google Antigravity tách biệt được cả tiến trình ngầm và CLI?</summary>
-            <p><code>ai-profile</code> biên dịch một Mach-O binary wrapper cho từng nền tảng: với Antigravity sẽ bọc cả Antigravity UI (<code>--user-data-dir</code>) và Go <code>language_server</code> (<code>--gemini_dir</code>, <code>--app_data_dir</code>); với Codex/ChatGPT sẽ tiêm <code>CODEX_HOME</code> và <code>CODEX_ELECTRON_USER_DATA_PATH</code>; với Grok sẽ tiêm <code>GROK_HOME</code>, <code>SAND_DATA_ROOT</code> và <code>SAND_USER_DATA_DIR</code>.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Mỗi profile có dùng riêng được cấu hình MCP Server không?</summary>
-            <p>Có 100%. Mỗi profile có một thư mục dữ liệu và file cấu hình MCP độc lập (<code>claude_desktop_config.json</code> cho Claude, <code>mcp_config.json</code> cho Antigravity, <code>config.toml</code> cho Codex và Grok), cho phép gắn MCP nội bộ công ty vào bản <code>Work</code> mà không ảnh hưởng đến bản <code>Personal</code>.</p>
-          </details>
-        </div>
+    <!-- 8. ECOSYSTEM -->
+    <section id="ecosystem" data-pace="chapter" aria-labelledby="ecosystem-h">
+      <h2 id="ecosystem-h" class="ds-heading" data-level="3">Ecosystem &amp; Links</h2>
+      <div class="link-list">
+        <a class="ds-icon-row" href="https://github.com/jangtrinh/multi-AI-profile#readme">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68Z"/></svg>
+          <span class="ds-icon-row-label">README: Full Vietnamese &amp; English Architecture Guide</span>
+          <span class="ds-icon-row-meta">github</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
+        <a class="ds-icon-row" href="https://github.com/jangtrinh/multi-AI-profile/blob/main/skills/multi-ai-profile/SKILL.md">
+          <svg class="ph" data-lead="true" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V184a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,144H40V56H216V184Z"/></svg>
+          <span class="ds-icon-row-label">SKILL.md: Universal Agent Skill for Claude Code, Codex &amp; Antigravity</span>
+          <span class="ds-icon-row-meta">skill</span>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg>
+        </a>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <strong>multi-AI-profile</strong> · MIT License · Built by <a href="https://github.com/jangtrinh" target="_blank" rel="noopener">Jang Trịnh</a>
-      </div>
-      <div class="footer-links">
-        <a href="https://github.com/jangtrinh/multi-AI-profile" target="_blank" rel="noopener">GitHub Repository ↗</a>
-        <a href="./llms.txt">llms.txt</a>
-        <a href="./sitemap.xml">sitemap.xml</a>
-      </div>
+  <footer class="ds-shell-footer">
+    <div class="ds-shell-footer-inner">
+      <a class="wordmark" href="https://github.com/jangtrinh">DESIGN:OS</a>
+      <nav class="ds-shell-footer-nav" aria-label="Footer">
+        <a class="ds-tab" href="https://github.com/jangtrinh/multi-AI-profile"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68Z"/></svg>GitHub</a>
+        <a class="ds-tab" href="https://github.com/jangtrinh/multi-AI-profile/blob/main/LICENSE">MIT</a>
+        <a class="ds-tab" href="#main">Back to top</a>
+      </nav>
     </div>
   </footer>
-
-  <script>
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const text = btn.getAttribute('data-copy');
-        await navigator.clipboard.writeText(text);
-        const old = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = old; }, 1600);
-      });
-    });
-  </script>
-  <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="jangtrinh" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+</div>
+<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="jangtrinh" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF813F" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
 </body>
 </html>
