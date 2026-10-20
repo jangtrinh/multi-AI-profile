@@ -4,7 +4,7 @@
 
 - Repository: https://github.com/jangtrinh/multi-AI-profile
 - Documentation: https://jangtrinh.github.io/multi-AI-profile/
-- License: MIT
+- License: PolyForm Shield 1.0.0 (no resale or competing products)
 
 ## Core CLI Commands
 - `ai-profile create <claude|antigravity|codex|chatgpt|grok|cursor|windsurf|cline|custom> "<Name>" [--color <preset|#HEX>] [--badge "<TEXT>"] [--app "/Applications/App.app"]`

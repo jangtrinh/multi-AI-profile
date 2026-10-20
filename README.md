@@ -5,7 +5,7 @@
 Instant APFS copy-on-write macOS bundle cloner and native Mach-O `execv()` launcher that isolates Electron UI storage, background Go/Rust daemons, CLI homes (`CLAUDE_CONFIG_DIR`, `--gemini_dir`, `CODEX_HOME`, `GROK_HOME`), MCP configs, and AltTab/Mission Control window names.
 
 <p align="left">
-  <img src="https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/License-PolyForm_Shield_1.0.0-2ea44f?style=flat-square" alt="PolyForm Shield 1.0.0 License" />
   <img src="https://img.shields.io/badge/Platform-macOS%20(APFS)-0f172a?style=flat-square" alt="macOS APFS" />
   <img src="https://img.shields.io/badge/Targets-Claude%20%C2%B7%20Antigravity%20%C2%B7%20Codex%20%C2%B7%20Grok%20%C2%B7%20Any%20App-2563eb?style=flat-square" alt="Supported Targets" />
   <img src="https://img.shields.io/badge/Disk%20Overhead-0%20MB%20(CoW)-6d28d9?style=flat-square" alt="Zero Disk Overhead" />
@@ -197,4 +197,4 @@ Agent sẽ tự động gọi `ai-profile` và hoàn tất trong 2 giây mà kh�
 
 ## License
 
-Phát hành dưới giấy phép [MIT License](LICENSE).
+Phát hành dưới giấy phép [PolyForm Shield 1.0.0](LICENSE): được dùng và sửa tự do, kể cả cho công việc có thu tiền; cấm bán lại hoặc làm sản phẩm cạnh tranh.
