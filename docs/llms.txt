@@ -1,12 +1,15 @@
-# multi-AI-profile
+# multi-AI-profile (v2.0)
 
-> Universal macOS APFS copy-on-write bundle cloner and native Mach-O launcher that isolates accounts, background daemons, CLI homes, MCP configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex/ChatGPT, xAI Grok, Cursor, Windsurf, Cline, and any Electron AI app.
+> Universal macOS APFS copy-on-write bundle cloner and native Mach-O launcher that isolates accounts, background daemons, CLI homes, MCP configs, and AltTab/Mission Control window names for Claude Desktop, Google Antigravity, OpenAI Codex/ChatGPT, xAI Grok, Cursor, Windsurf, Cline, and any Electron AI app — while automatically symlinking shared global skills, agents, rules, and plugins.
 
 - Repository: https://github.com/jangtrinh/multi-AI-profile
 - Documentation: https://jangtrinh.github.io/multi-AI-profile/
 - License: PolyForm Shield 1.0.0 (no resale or competing products)
 
 ## Core CLI Commands
-- `ai-profile create <claude|antigravity|codex|chatgpt|grok|cursor|windsurf|cline|custom> "<Name>" [--color <preset|#HEX>] [--badge "<TEXT>"] [--app "/Applications/App.app"]`
-- `ai-profile list [target]`
-- `ai-profile remove <target> "<Name>" [--purge-data]`
+- `ai-profile create <claude|antigravity|codex|chatgpt|codex-web|grok|cursor|windsurf|cline|custom> "<Name>" [--color <preset|#HEX>] [--badge "<TEXT>"] [--share-auth] [--app "/Applications/App.app"] [--json]`
+- `ai-profile list [target] [--json]`
+- `ai-profile doctor [--fix] [--json]`
+- `ai-profile migrate [--dry-run] [--json]`
+- `ai-profile remove <target> "<Name>" [--purge-data] [--json]`
+- Shortcuts: `claude-profile`, `agy-profile`, `codex-profile`, `chatgpt-profile`, `grok-profile`, `cursor-profile`

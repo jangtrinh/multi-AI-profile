@@ -266,8 +266,10 @@ ai-profile create grok "Extra" --color purple
 ai-profile create cursor "Work" --color emerald
 ai-profile create custom "Work" --app "/Applications/Perplexity.app" --color cyan
 
-# List or remove profiles
-ai-profile list
+# Audit health, migrate legacy osacompile applets, list (--json), or remove profiles
+ai-profile doctor --fix
+ai-profile migrate
+ai-profile list --json
 ai-profile remove codex "Extra"</code></pre>
     </section>
 

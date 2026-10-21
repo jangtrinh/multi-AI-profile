@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET="cursor"
+cmd="${1:-}"
+case "${cmd}" in
+  create|list|remove|delete)
+    shift
+    if [[ "${1:-}" == "${TARGET}" ]]; then shift; fi
+    exec "${SCRIPT_DIR}/ai-profile" "${cmd}" "${TARGET}" "$@"
+    ;;
+  doctor|migrate|--version)
+    exec "${SCRIPT_DIR}/ai-profile" "$@"
+    ;;
+  *)
+    echo "Usage: $(basename "$0") <create|list|remove|doctor|migrate> [args...]"
+    echo "Shortcut for: ai-profile <command> ${TARGET} ..."
+    echo ""
+    exec "${SCRIPT_DIR}/ai-profile" --help
+    ;;
+esac

@@ -53,14 +53,14 @@ Bộ công cụ `ai-profile` (cùng các lệnh tắt `claude-profile`, `agy-pro
 
 ### 5 bước kỹ thuật tự động bên dưới:
 
-1. **Nhân bản Zero-Copy với APFS (`cp -cR`):** Clone nguyên bản `.app` từ `/Applications/` sang `~/Applications/<App> <Profile>.app` bằng cơ chế Copy-on-Write của APFS — tốn **0 MB** dung lượng thật và hoàn tất trong chưa đầy 1 giây.
-2. **Patch `Info.plist` & toàn bộ Framework Helpers:** Đổi `CFBundleName`, `CFBundleDisplayName`, `CFBundleIdentifier` của cả app chính lẫn toàn bộ các tiến trình con (`*Helper (Renderer).app`, `Codex Framework.framework/Helpers/Codex (*.app)`), đồng thời loại bỏ khóa `CFBundleIconName` / `LSHasLocalizedDisplayName` để macOS WindowServer luôn hiển thị đúng tên và icon mới.
-3. **Biên dịch Native Mach-O Binary (`clang -O2` Universal Binary):** Đổi tên binary gốc thành `*Real` và biên dịch một file thực thi C mỏng nhẹ gọi trực tiếp `execv()` kèm cờ `--user-data-dir` và các biến môi trường cô lập.
-4. **Cách ly đa tầng (Multi-Layer Daemon & CLI Isolation) theo từng hãng AI:**
-   - **Claude Desktop (`claude`):** Cô lập `--user-data-dir` (`~/Library/Application Support/Claude-<Profile>`), `CLAUDE_CONFIG_DIR` (`~/.claude-profiles/<slug>`) và `claude_desktop_config.json`.
-   - **Google Antigravity (`antigravity` / `agy`):** Bọc **2 tầng Mach-O** cho cả `Contents/MacOS/Antigravity` (`--user-data-dir`) lẫn Go daemon `Contents/Resources/bin/language_server_macos_arm` (`--gemini_dir` & `--app_data_dir`), giữ nguyên theme/extension từ bản gốc.
-   - **OpenAI Codex / ChatGPT (`codex` / `chatgpt`):** Cô lập `--user-data-dir`, `CODEX_ELECTRON_USER_DATA_PATH` và `CODEX_HOME` (`~/.codex-profiles/<slug>/config.toml` & `auth.json`). Với target `codex`, tự động kích hoạt bộ icon **Codex Dark (`>_`)** chính chủ ẩn bên trong bundle `ChatGPT.app`.
-   - **xAI Grok Desktop (`grok`):** Cô lập `--user-data-dir`, `SAND_USER_DATA_DIR`, daemon socket `SAND_DATA_ROOT` (`~/.grokbot-profiles/<slug>`) và `GROK_HOME` (`~/.grok-profiles/<slug>/config.toml` & `auth.json`).
+1. **Nhân bản Zero-Copy với APFS (`cp -cR`):** Clone nguyên bản `.app` từ `/Applications/` sang `~/Applications/<App> <Profile>.app` bằng cơ chế Copy-on-Write của APFS — tốn **0 MB** dung lượng thật và hoàn tất trong chưa đầy 1 giây. Tự động dọn dẹp các `osacompile` applet cũ bị trùng tên trong `/Applications` hoặc `~/Applications`.
+2. **Patch `Info.plist`, `NSDockTilePlugIn` & toàn bộ Framework Helpers:** Đổi `CFBundleName`, `CFBundleDisplayName`, `CFBundleIdentifier` của cả app chính lẫn toàn bộ các tiến trình con (`*Helper (Renderer).app`, `Codex Framework.framework/Helpers/Codex (*.app)`), đồng thời loại bỏ khóa `CFBundleIconName`, `LSHasLocalizedDisplayName`, `NSDockTilePlugIn` (`CodexDockTilePlugin.docktileplugin`) và `CodexAppIconBaseName` để macOS WindowServer & Dock không bao giờ ghi đè tên hoặc icon lúc đang chạy.
+3. **Biên dịch Native Mach-O Binary (`clang -O2` khớp kiến trúc `lipo -archs`):** Đổi tên binary gốc thành `*Real` và biên dịch một file thực thi C mỏng nhẹ gọi trực tiếp `execv()` kèm cờ `--user-data-dir` và các biến môi trường cô lập.
+4. **Cách ly đa tầng (Multi-Layer Daemon & CLI Isolation) + Tự động Symlink Skills/Agents dùng chung:**
+   - **Claude Desktop (`claude`):** Cô lập `--user-data-dir` (`~/Library/Application Support/Claude-<Profile>`), `CLAUDE_CONFIG_DIR` (`~/.claude-profiles/<slug>`) và `claude_desktop_config.json`; tự động symlink `CLAUDE.md`, `rules`, `agents`, `skills`, `commands`, `plugins` từ `~/.claude`.
+   - **Google Antigravity (`antigravity` / `agy`):** Bọc **2 tầng Mach-O** cho cả `Contents/MacOS/Antigravity` (`--user-data-dir`) lẫn Go daemon `Contents/Resources/bin/language_server` (tự động lọc bỏ `--app_data_dir` mặc định từ Electron và ghi đè `--gemini_dir`, `--app_data_dir`, `--local_chrome_user_data_dir`), đồng thời symlink `GEMINI.md`, `skills`, `config/{skills,agents,plugins,hooks,rules}` từ `~/.gemini` và hỗ trợ `--share-auth`.
+   - **OpenAI Codex / ChatGPT (`codex` / `chatgpt` / `codex-web`):** Cô lập `--user-data-dir`, `CODEX_ELECTRON_USER_DATA_PATH` và `CODEX_HOME` (`~/.codex-profiles/<slug>/config.toml` & `auth.json`), symlink `AGENTS.md`, `agents`, `skills`, `plugins` từ `~/.codex`. Với target `codex`, tự động kích hoạt bộ icon **Codex Dark (`>_`)** chính chủ ẩn bên trong bundle `ChatGPT.app`.
+   - **xAI Grok Desktop (`grok`):** Cô lập `--user-data-dir`, `SAND_USER_DATA_DIR`, daemon socket `SAND_DATA_ROOT` (`~/.grokbot-profiles/<slug>`) và `GROK_HOME` (`~/.grok-profiles/<slug>/config.toml` & `auth.json`), symlink `agents`, `rules`, `skills`, `hooks` từ `~/.grok`.
    - **Cursor / Windsurf / Cline / Bất kỳ App nào (`--app`):** Tự động nhận diện `CFBundleExecutable`, `CFBundleIconFile`, bọc Mach-O `--user-data-dir` và đóng dấu icon.
 5. **Tự động vẽ Pill Badge lên `.icns` & Ký số Ad-hoc (`codesign`):** Chuẩn hóa icon gốc về `1024×1024`, vẽ nhãn chữ nổi bật (`WORK`, `EXTRA`...) vào toàn bộ 10 kích thước chuẩn Apple Iconset, xóa `Assets.car` trong bản clone để tránh macOS Sequoia ghi đè icon, ký lại bằng `codesign --force --deep --sign -` và đăng ký ngay với `lsregister`.
 
@@ -152,19 +152,33 @@ ai-profile create cursor "Work" --color emerald
 ai-profile create custom "Work" --app "/Applications/Perplexity.app" --color cyan
 ```
 
-*(Bạn cũng có thể dùng các lệnh tắt tương đương: `claude-profile`, `agy-profile`, `codex-profile`, `grok-profile`).*
+*(Bạn cũng có thể dùng các lệnh tắt tương đương: `claude-profile`, `agy-profile`, `codex-profile`, `chatgpt-profile`, `grok-profile`, `cursor-profile`).*
 
-### Bước 3: Liệt kê hoặc gỡ bỏ Profile
+### Bước 3: Kiểm tra sức khỏe (`doctor`), Nâng cấp Applet cũ (`migrate`), Liệt kê hoặc Gỡ bỏ Profile
 
 ```bash
-# Xem toàn bộ danh sách các AI profile đang có trên máy và đường dẫn MCP/Config tương ứng
+# Kiểm tra toàn bộ dependencies, chữ ký số codesign và phát hiện osacompile applet cũ
+ai-profile doctor
+ai-profile doctor --fix
+
+# Tự động nâng cấp toàn bộ các AppleScript (osacompile) applet cũ lên chuẩn Native Mach-O (giữ nguyên 100% dữ liệu)
+ai-profile migrate
+
+# Xem toàn bộ danh sách các AI profile đang có trên máy (hỗ trợ xuất --json cho Agent/CI)
 ai-profile list
+ai-profile list --json
+
+# Tạo profile dùng chung tài khoản đăng nhập gốc nhưng tách riêng cửa sổ & lịch sử hội thoại
+ai-profile create antigravity "Sandbox" --color cyan --share-auth
 
 # Xóa app khỏi ~/Applications (mặc định giữ lại dữ liệu đăng nhập an toàn)
 ai-profile remove codex "Extra"
 
 # Xóa cả app lẫn toàn bộ dữ liệu đăng nhập của profile đó
 ai-profile remove codex "Extra" --purge-data
+
+# Chạy bộ kiểm thử tự động (Unit & Integration Tests)
+python3 -m unittest discover -s tests -v
 ```
 
 ---
